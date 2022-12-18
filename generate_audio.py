@@ -35,39 +35,41 @@ def fade_out(audio, seconds_from_end, sr):
     if seconds_from_end * sr >= n:
         return audio
     start_index = n - seconds_from_end * sr
-    fade = np.concatenate((audio[:start_index], audio[start_index:] - audio[start_index:] * np.arange(0, 1, 1 / (n - start_index))))
+    fade = np.concatenate((audio[:start_index], audio[start_index:] - audio[start_index:] * np.arange(0, 1, 1 / (n - start_index)).reshape(-1, 1)))
     return fade
 
 
-def random_chord(vol, duration, hz, sr, n, key="minor"):
+def alien(vol, duration, hz, sr, n, key="minor"):
     dist = softmax(np.random.random(n))
     t = np.arange(0, duration, 1.0 / sr)
-    if key == "major":
-        choices = get_relative_major(hz)
-    elif key == "dominant":
-        choices = get_phrygian_dominant(hz)
-    elif key == "minor":
-        choices = get_relative_minor(hz)
+    frequencies = get_frequencies(key, hz)
     funcs = [sine, sawtooth, square]
-    seq = vol * np.array([(1 - np.exp(-2 / duration * t)).reshape(-1, 1) * pan(sine(vol, duration, np.random.choice(choices) + np.random.normal(0, 1), sr, shift=np.random.random()), np.random.random()) for i in range(n)])
+    seq = vol * np.array([pan(sine(vol, duration, np.random.choice(frequencies) + t * np.exp(-np.random.normal(0, 10) * t), sr, shift=.4 * np.random.random() - .2), np.random.random()) for i in range(n)])
     combined = np.sum(seq, axis=0)
     normalized = combined / np.max(np.abs(combined))
     return normalized
 
 
-def harmonics(vol, duration, hz, sr, key="minor"):
+def shifter(vol, duration, hz, sr, n, bpm, key="power"):
+    t = np.arange(0, duration, 1.0 / sr)
+    frequencies = get_frequencies(key, hz)
+    sample1 = .2 * harmonics(vol, duration, hz, sr, n, key="power")
+    sample2 = .2 * np.sin(2 * np.pi * hz * t - np.sin(bpm * t))
+    sample3 = .2 * np.sin((2 * np.pi * hz + np.sin(bpm * t)) * t - np.sin(bpm * t))
+    sample4 = .1 * sawtooth(vol, duration, 2 * hz, sr, shift=np.sin(bpm * t))
+    sample5 = .3 * harmonics(vol, duration, hz * 2 ** (7 / 12), sr, n, key="power")
+
+    return sample1 + pan(sample2) + pan(sample3) + pan(sample4)
+
+
+def harmonics(vol, duration, hz, sr, n, key="minor"):
     """
     Spooky noises
     """
-    funcs = [sine]
+    funcs = [sine, sawtooth, square]
     t = np.arange(0, duration, 1.0 / sr)
-    if key == "major":
-        frequencies = get_major_triad(hz)
-    elif key == "minor":
-        frequencies = get_minor_triad(hz)
-    elif key == "sus":
-        frequencies = get_sus_second(hz)
-    output = np.sum(np.array([np.random.choice(funcs)(vol, duration, np.random.choice(frequencies) + np.sin(np.random.random() * t), sr, shift=.4 * np.random.random() - .2) for i in range(100)]), axis=0)
+    frequencies = get_frequencies(key, hz)
+    output = np.sum(np.array([pan(np.random.choice(funcs)(vol, duration, np.random.choice(frequencies) + np.sin(np.random.random() * t), sr, shift=.4 * np.random.random() - .2), direction=np.random.random()) for i in range(n)]), axis=0)
     rescaled = output / np.max(np.abs(output))
     return rescaled
 
@@ -93,17 +95,31 @@ def pan(audio, direction=0.5):
 
 
 def stereo_test(sample_rate):
-    sample1 = aug_note(1, .5, 440, sample_rate)
-    sample2 = aug_note(1, .5, 440 * 2 ** (3 / 12), sample_rate)
+    sample1 = aug_note(1, .5, 293.66, sample_rate)
+    sample2 = aug_note(1, .5, 293.66 * 2 ** (3 / 12), sample_rate)
     return np.array([sample1, sample2]).T
+
+
+def soul_hemorrhage(sample_rate, bpm):
+    n = 100
+    sample1 = harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="major")
+    sample2 = harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="major")
+    sample3 = harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="power")
+    sample4 = harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-1 / 6), sample_rate, n, key="power")
+    sample5 = harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="power")
+    sample6 = harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="power")
+    sample7 = harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (5 / 12), sample_rate, n, key="minor")
+    sample8 = harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 4), sample_rate, n, key="major")
+    audio = np.concatenate((sample1, sample2, sample3, sample4, sample5, sample4, sample6, sample1, sample7, sample8))
+    faded = fade_out(audio, 1, sample_rate)
+    sf.write("audio/hemorrhage.wav", faded, sample_rate)
 
 
 if __name__ == "__main__":
     sample_rate = 44100
-    sample1 = harmonics(1, 5, 440, sample_rate, key="major")
-    sample2 = harmonics(1, 5, 440 * 2 ** (-1 / 6), sample_rate, key="sus")
-    audio = np.concatenate((sample1, sample2))
-    faded = fade_out(audio, 3, sample_rate)
-    sf.write("audio/test.wav", faded, sample_rate)
+    bpm = 120
+    soul_hemorrhage(sample_rate, 155)
+    #audio = shifter(1, 4, 293.66, sample_rate, 10, bpm)
+    #sf.write("audio/test.wav", audio, sample_rate)
     #spec = librosa.feature.melspectrogram(y=audio, sr=sample_rate, n_mels=128)
     #librosa.display.specshow(spec)

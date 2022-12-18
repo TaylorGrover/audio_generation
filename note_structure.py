@@ -26,6 +26,30 @@ def get_major_triad(hz):
 def get_sus_second(hz):
     return get_notes(hz, [0, 2, 7])
 
+
+def get_power(hz):
+    return get_notes(hz, [0, 7])
+
+
+def get_chromatic(hz):
+    return get_notes(hz, [i for i in range(12)])
+
+
+def get_frequencies(key, hz):
+    if key == "major":
+        frequencies = get_major_triad(hz)
+    elif key == "minor":
+        frequencies = get_minor_triad(hz)
+    elif key == "sus":
+        frequencies = get_sus_second(hz)
+    elif key == "power":
+        frequencies = get_power(hz)
+    elif key == "chromatic":
+        frequencies = get_chromatic(hz)
+    else: # Default to power chord
+        frequencies = get_power(hz)
+    return frequencies
+
 def get_notes(hz, n):
     notes = []
     for i in range(-2, 2, 1):
