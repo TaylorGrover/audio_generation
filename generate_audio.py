@@ -43,9 +43,20 @@ def alien(vol, duration, hz, sr, n, key="minor"):
     dist = softmax(np.random.random(n))
     t = np.arange(0, duration, 1.0 / sr)
     frequencies = get_frequencies(key, hz)
-    funcs = [sine, sawtooth, square]
-    seq = vol * np.array([pan(sine(vol, duration, np.random.choice(frequencies) + t * np.exp(-np.random.normal(0, 10) * t), sr, shift=.4 * np.random.random() - .2), np.random.random()) for i in range(n)])
+    funcs = [sine, sawtooth, square, triangular]
+    seq = []
+    dist = softmax(np.random.random(n))
+    for i in range(n):
+        func = np.random.choice(funcs)
+        freq = np.random.choice(frequencies)
+        jump = freq * 2 ** (7 / 12) / (freq + np.exp(-freq * t))
+        shift = .4 * np.random.random() - .2
+        waveform = pan(func(vol, duration, freq + jump, sr, shift=shift), np.random.normal(.5, .1))
+        seq.append(waveform)
+    seq = np.array(seq)
     combined = np.sum(seq, axis=0)
+    print(np.max(combined))
+    print(np.min(combined))
     normalized = combined / np.max(np.abs(combined))
     return normalized
 
@@ -55,8 +66,8 @@ def shifter(vol, duration, hz, sr, n, bpm, key="power"):
     frequencies = get_frequencies(key, hz)
     sample1 = .2 * harmonics(vol, duration, hz, sr, n, key="power")
     sample2 = .2 * np.sin(2 * np.pi * hz * t - np.sin(bpm * t))
-    sample3 = .2 * np.sin((2 * np.pi * hz + np.sin(bpm * t)) * t - np.sin(bpm * t))
-    sample4 = .1 * sawtooth(vol, duration, 2 * hz, sr, shift=np.sin(bpm * t))
+    sample3 = .2 * np.sin((2 * np.pi * hz))
+    sample4 = .1 * triangular(vol, duration, 2 * hz, sr, shift=np.sin(bpm * t))
     sample5 = .3 * harmonics(vol, duration, hz * 2 ** (7 / 12), sr, n, key="power")
 
     return sample1 + pan(sample2) + pan(sample3) + pan(sample4)
@@ -66,7 +77,7 @@ def harmonics(vol, duration, hz, sr, n, key="minor"):
     """
     Spooky noises
     """
-    funcs = [sine, sawtooth, square]
+    funcs = [sine, sawtooth, square, triangular]
     t = np.arange(0, duration, 1.0 / sr)
     frequencies = get_frequencies(key, hz)
     output = np.sum(np.array([pan(np.random.choice(funcs)(vol, duration, np.random.choice(frequencies) + np.sin(np.random.random() * t), sr, shift=.4 * np.random.random() - .2), direction=np.random.random()) for i in range(n)]), axis=0)
@@ -118,8 +129,12 @@ def soul_hemorrhage(sample_rate, bpm):
 if __name__ == "__main__":
     sample_rate = 44100
     bpm = 120
-    soul_hemorrhage(sample_rate, 155)
-    #audio = shifter(1, 4, 293.66, sample_rate, 10, bpm)
-    #sf.write("audio/test.wav", audio, sample_rate)
+    #soul_hemorrhage(sample_rate, 155)
+    audio = alien(1, 10, 293.66, sample_rate, 10)
+    sf.write("audio/test.wav", audio, sample_rate)
+    plt.ion()
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+    ax1.plot(audio.T[0])
+    ax2.plot(audio.T[1])
     #spec = librosa.feature.melspectrogram(y=audio, sr=sample_rate, n_mels=128)
     #librosa.display.specshow(spec)

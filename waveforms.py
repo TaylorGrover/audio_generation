@@ -28,12 +28,17 @@ def sawtooth(vol, duration, hz, sr, shift=0, form="positive"):
     return 2 * vol * diff
 
 
-def triangular(vol, duration, hz, sr):
+def triangular(vol, duration, hz, sr, shift=0):
     assert duration > 0
     t = np.arange(0, duration, 1.0 / sr)
-    scaled = t * hz
-    
+    return 2 / np.pi * np.arcsin(np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift))
+
 
 if __name__ == "__main__":
     sr = 44100
+    duration = 2
+    t = np.arange(0, duration, 1.0 / sr)
+    audio = triangular(1, duration, 3, sr)
 
+    fig, ax = plt.subplots()
+    ax.plot(t, audio)

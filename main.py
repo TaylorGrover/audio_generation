@@ -1,15 +1,20 @@
 import numpy as np
+import os
+import soundfile as sf
+import sys
+
+from waveforms import *
+
 from PySide6 import QtWidgets
-from PySide6.QtGui import QAction, QColor, QIcon, QPalette
+from PySide6.QtGui import QAction, QColor, QIcon, QPalette, QPixmap
 from PySide6.QtWidgets import (QApplication, QPushButton, QCheckBox, QComboBox,
     QHBoxLayout, QFormLayout, QGridLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
     QMessageBox, QTabWidget, QToolBar, QWidget)
 import pyqtgraph as pg
-import soundfile as sf
-import sys
 
 
 sample_rate = 44100
+IMAGE_DIR = "images"
 
 class MainWindow(QMainWindow):
     """
@@ -79,20 +84,27 @@ class WaveformTab(QWidget):
         super().__init__()
         self.formLayout = QFormLayout(self)
         self.graphWidget = pg.PlotWidget()
+        self.addWaveButton = QPushButton("Add Waveform")
+        self.addWaveButton.clicked.connect(self.createWaveTab)
         hPen = pg.mkPen("#00ffff", width=3)
         fPen = pg.mkPen("r", width=3)
-        self.waveform = np.zeros(10)
-        self.graphWidget.plot(np.linspace(0, 1, 10), self.waveform, pen=hPen)
-        playAction = QAction(QIcon(":/icons/elementary/media-playback-start.png"), "&Run", self, triggered=self.playWaveform())
-        playAction.setShortcut("Space")
-        playAction.setCheckable(True)
-        playAction.setStatusTip("Play")
-        self.addAction(playAction)
+        self.t = np.arange(0, 1, 1.0 / sample_rate)
+        self.waveforms = np.array([])
+        self.graphWidget.plot(self.t, np.sum(self.waveforms, axis=0), pen=hPen)
         self.graphWidget.setMinimumWidth(self.graphWidget.height())
         self.formLayout.addRow("", self.graphWidget)
+        self.formLayout.addRow("", self.addWaveButton)
 
     def playWaveform(self):
+        """
+        TODO: Implement
+        """
         sf.write("audio/waveform.wav", self.waveform, sample_rate)
+
+    def createWaveTab(self):
+        """
+        """
+        print("asdf")
 
 
 def start_gui():
@@ -100,7 +112,7 @@ def start_gui():
     mainWin = MainWindow()
     mainWin.setWindowTitle("Waveform Constructor")
     availableGeometry = mainWin.screen().availableGeometry()
-    mainWin.resize(availableGeometry.width() / 3, availableGeometry.height() / 2)
+    mainWin.resize(availableGeometry.width(), availableGeometry.height())
     mainWin.show()
     sys.exit(app.exec())
 
