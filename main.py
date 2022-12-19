@@ -6,14 +6,16 @@ import sys
 from waveforms import *
 
 from PySide6 import QtWidgets
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QAction, QColor, QIcon, QPalette, QPixmap
+from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QApplication, QPushButton, QCheckBox, QComboBox,
     QHBoxLayout, QFormLayout, QGridLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
     QMessageBox, QTabWidget, QToolBar, QWidget)
 import pyqtgraph as pg
 
 
-sample_rate = 44100
+SAMPLE_RATE = 44100
 IMAGE_DIR = "images"
 
 class MainWindow(QMainWindow):
@@ -88,8 +90,8 @@ class WaveformTab(QWidget):
         self.addWaveButton.clicked.connect(self.createWaveTab)
         hPen = pg.mkPen("#00ffff", width=3)
         fPen = pg.mkPen("r", width=3)
-        self.t = np.arange(0, 1, 1.0 / sample_rate)
-        self.waveforms = np.array([])
+        self.t = np.arange(0, 1, 1.0 / SAMPLE_RATE)
+        self.waveforms = [Waveform(1, 1, 3, 0, sine, )]
         self.graphWidget.plot(self.t, np.sum(self.waveforms, axis=0), pen=hPen)
         self.graphWidget.setMinimumWidth(self.graphWidget.height())
         self.formLayout.addRow("", self.graphWidget)
@@ -99,7 +101,7 @@ class WaveformTab(QWidget):
         """
         TODO: Implement
         """
-        sf.write("audio/waveform.wav", self.waveform, sample_rate)
+        self.effect = QSoundEffect()
 
     def createWaveTab(self):
         """
