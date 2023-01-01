@@ -104,6 +104,12 @@ def pan(audio, direction=0.5):
     return panned
 
 
+def filter(audio, freq_range, amp_dec):
+    """
+    Decrease range of frequencies by specified amplitude
+    """
+
+
 
 def stereo_test(sample_rate):
     sample1 = aug_note(1, .5, 293.66, sample_rate)

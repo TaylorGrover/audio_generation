@@ -1,10 +1,13 @@
 from PySide6.QtCore import QUrl
 from PySide6.QtMultimedia import QSoundEffect
+import glob
 import matplotlib.pyplot as plt
 plt.ion()
 import numpy as np
+import os
 import shutil
 import soundfile as sf
+import string
 
 
 AUDIO_DIR = "audio"
@@ -41,14 +44,46 @@ def triangular(vol, duration, hz, sr, shift=0):
 
 
 def play(waveform, sr=44100):
-    path = os.path.join(AUDIO_DIR, "tmp.wav")
+    chars = [char for char in string.ascii_letters]
+    name = "".join(np.random.choice(chars, 8, replace=True)) + ".wav"
+    path = os.path.join(AUDIO_DIR, name)
     sf.write(path, waveform, sr)
     url = QUrl.fromLocalFile(path)
     effect = QSoundEffect()
     effect.setSource(url)
     effect.setLoopCount(QSoundEffect.Infinite)
     effect.play()
+    os.remove(path)
     return effect
+
+
+class SoundPlayer:
+    def __init__(self, waveform, sr, loopCount=QSoundEffect.Infinite):
+        self.tmp = []
+        self.chars = [char for char in string.ascii_letters]
+        self.base_dir = os.path.join(AUDIO_DIR, "tmp")
+        self.waveform = waveform
+        self.sr = sr
+        self.loopCount = loopCount
+        self.started = False
+    def play(self):
+        if not self.started:
+            self.name = "".join(np.random.choice(self.chars, 8, replace=True)) + ".wav"
+            self.path = os.path.join(self.base_dir, self.name)
+            self.tmp.append(self.path)
+            sf.write(self.path, self.waveform, self.sr)
+            self.url = QUrl.fromLocalFile(self.path)
+            self.effect = QSoundEffect()
+            self.effect.setSource(self.url)
+            self.effect.setLoopCount(self.loopCount)
+            self.effect.play()
+            self.started = True
+    def stop(self):
+        if self.started:
+            self.effect.stop()
+            self.started = False
+        for file in glob.glob(self.base_dir + "/*"):
+            os.remove(file)
 
 
 class Waveform:

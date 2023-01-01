@@ -6,12 +6,12 @@ import sys
 from waveforms import *
 
 from PySide6 import QtWidgets
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl, QSize
 from PySide6.QtGui import QAction, QColor, QIcon, QPalette, QPixmap
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QApplication, QPushButton, QCheckBox, QComboBox,
     QHBoxLayout, QFormLayout, QGridLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
-    QMessageBox, QTabWidget, QToolBar, QWidget)
+    QMessageBox, QTabWidget, QToolBar, QWidget, QDial)
 import pyqtgraph as pg
 
 
@@ -25,9 +25,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         toolBar = QToolBar()
         self.addToolBar(toolBar)
-        self.tabWindow = QTabWidget()
-        self.waveformTab = WaveformTab()
-        self.tabWindow.addTab(self.waveformTab, "Instrument Visualizer")
+        self.waveformWindow = WaveformWindow()
         fileMenu = self.menuBar().addMenu("&File")
         editMenu = self.menuBar().addMenu("&Edit")
         viewMenu = self.menuBar().addMenu("&View")
@@ -35,7 +33,7 @@ class MainWindow(QMainWindow):
         fullScreenAction = QAction("&Fullscreen", self, shortcut="F11", triggered = self.maximize)
         fileMenu.addAction(exitAction)
         viewMenu.addAction(fullScreenAction)
-        self.setCentralWidget(self.tabWindow)
+        self.setCentralWidget(self.waveformWindow)
         self.maximized = False
         self.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
         self.createPalette()
@@ -77,36 +75,88 @@ class MainWindow(QMainWindow):
         self.maximized = not self.maximized
 
 
-class WaveformTab(QWidget):
+class WaveformWindow(QWidget):
     """
     Contains the graph to display a single period of the current waveform, and 
     a menu to add waveforms.
     """
     def __init__(self):
         super().__init__()
-        self.formLayout = QFormLayout(self)
-        self.graphWidget = pg.PlotWidget()
-        self.addWaveButton = QPushButton("Add Waveform")
-        self.addWaveButton.clicked.connect(self.createWaveTab)
-        hPen = pg.mkPen("#00ffff", width=3)
-        fPen = pg.mkPen("r", width=3)
+        self.gridLayout = QGridLayout(self)
+        self.graphWidget = GraphWidget()
+        self.configContainer = QTabWidget()
+        #self.addWaveButton = QPushButton("Add Waveform")
+        #self.addWaveButton.clicked.connect(self.createWaveTab)
         self.t = np.arange(0, 1, 1.0 / SAMPLE_RATE)
-        self.waveforms = [Waveform(1, 1, 3, 0, sine, )]
-        self.graphWidget.plot(self.t, np.sum(self.waveforms, axis=0), pen=hPen)
-        self.graphWidget.setMinimumWidth(self.graphWidget.height())
-        self.formLayout.addRow("", self.graphWidget)
-        self.formLayout.addRow("", self.addWaveButton)
+        firstWaveform = Waveform(1, 1, 3, 0, sine, SAMPLE_RATE)
+        self.waveforms = [firstWaveform]
+        self.configContainer.addTab(WaveformConfigWindow(), "")
+        self.plot()
+        self.gridLayout.addWidget(self.graphWidget, 0, 0)
+        self.gridLayout.addWidget(self.configContainer, 0, 1)
 
     def playWaveform(self):
         """
         TODO: Implement
         """
-        self.effect = QSoundEffect()
+        interference = np.sum(self.waveforms, axis=0)
+        #self.effect = play(
 
-    def createWaveTab(self):
+    def plot(self):
         """
+        Call plot on graphWidget
         """
-        print("asdf")
+        self.graphWidget.plot(self.t, self.waveforms)
+
+
+class WaveformConfigWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.formLayout = QFormLayout(self)
+        self.ampDial, self.ampEdit, ampWidget = self._createHBoxRow("Amplitude")
+        self.freqDial, self.freqEdit, freqWidget = self._createHBoxRow("Frequency")
+        self.phaseDial, self.phaseEdit, phaseWidget = self._createHBoxRow("Phase Shift")
+        self.formLayout.addWidget(ampWidget)
+        self.formLayout.addWidget(freqWidget)
+        self.formLayout.addWidget(phaseWidget)
+        #self.
+
+    def _createHBoxRow(self, text):
+        qwidget = QWidget()
+        hBoxLayout = QHBoxLayout(qwidget)
+        text = QLabel(text)
+        dial = QDial()
+        lineEdit = QLineEdit()
+        print(lineEdit.size())
+        hBoxLayout.addWidget(text)
+        hBoxLayout.addWidget(dial)
+        hBoxLayout.addWidget(lineEdit)
+        return dial, lineEdit, qwidget
+
+
+
+class GraphWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.gridLayout = QGridLayout(self)
+        self.graph = pg.PlotWidget()
+        self.graphButtonWidget = QWidget()
+        self.buttonLayout = QHBoxLayout(self.graphButtonWidget)
+        self.playButton = QPushButton("Play")
+        self.playButton.setMinimumSize(QSize(30, 30))
+        self.playButton.setMaximumSize(QSize(100, 100))
+        self.durationDial = QDial()
+        self.buttonLayout.addWidget(self.playButton)
+        self.buttonLayout.addWidget(self.durationDial)
+        self.gridLayout.addWidget(self.graph, 0, 0)
+        self.gridLayout.addWidget(self.graphButtonWidget, 1, 0)
+
+    def plot(self, t, waveforms):
+        hPen = pg.mkPen("#00ffff", width=3)
+        fPen = pg.mkPen("r", width=3)
+        self.graph.plot(t, np.sum(waveforms, axis=0), pen=hPen)
+        #self.graph.setMinimumWidth(self.graphWidget.height())
+
 
 
 def start_gui():
