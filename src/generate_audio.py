@@ -39,6 +39,14 @@ def fade_out(audio, seconds_from_end, sr):
     return fade
 
 
+def all_forms(vol, duration, hz, sr, shift=0):
+    saw = .25 * sawtooth(vol, duration, hz, sr, shift=shift + np.random.random())
+    tri = .25 * triangular(vol, duration, hz, sr, shift=shift + np.random.random())
+    squ = .25 * square(vol, duration, hz, sr, shift=shift + np.random.random())
+    sin = .25 * sine(vol, duration, hz, sr, shift=shift + np.random.random())
+    return saw + tri + squ + sin
+
+
 def alien(vol, duration, hz, sr, n, key="minor"):
     dist = softmax(np.random.random(n))
     t = np.arange(0, duration, 1.0 / sr)
@@ -110,6 +118,14 @@ def filter(audio, freq_range, amp_dec):
     """
 
 
+def wave_combo(duration, sr, *args):
+    """
+    variable number of freq arguments
+    """
+    waves = [all_forms(1, duration, arg, sr, shift=np.random.random()) for arg in args]
+    audio = np.mean(waves, axis=0)
+    return audio
+    
 
 def stereo_test(sample_rate):
     sample1 = aug_note(1, .5, 293.66, sample_rate)
@@ -135,12 +151,10 @@ def soul_hemorrhage(sample_rate, bpm):
 if __name__ == "__main__":
     sample_rate = 44100
     bpm = 120
+
     #soul_hemorrhage(sample_rate, 155)
-    audio = alien(1, 10, 293.66, sample_rate, 10)
+    audio = wave_combo(2, sample_rate, 440, 440 * 2 ** (7 / 12), 440 * 2 ** (1 / 4), 440 * 2)
     sf.write("audio/test.wav", audio, sample_rate)
     plt.ion()
-    fig, (ax1, ax2) = plt.subplots(2, 1)
-    ax1.plot(audio.T[0])
-    ax2.plot(audio.T[1])
     #spec = librosa.feature.melspectrogram(y=audio, sr=sample_rate, n_mels=128)
     #librosa.display.specshow(spec)
