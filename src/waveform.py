@@ -45,14 +45,14 @@ def triangular(vol, duration, hz, sr, shift=0):
     t = np.arange(0, duration, 1.0 / sr)
     return 2 / np.pi * np.arcsin(np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift))
 
-FORM_MAP = {
+FORM_TO_STR_MAP = {
     sine: "sine",
     square: "square",
     sawtooth: "sawtooth",
     triangular: "triangular",
 }
 
-FORM_REVERSE_MAP = dict((FORM_MAP[form], form) for form in FORM_MAP)
+STRING_TO_FORM_MAP = dict((FORM_TO_STR_MAP[form], form) for form in FORM_TO_STR_MAP)
 
 def play(waveform, sr=44100):
     chars = [char for char in string.ascii_letters]
@@ -168,7 +168,7 @@ class Waveform:
             "hz": self.hz,
             "sr": self.sr,
             "shift": self.shift,
-            "form": FORM_MAP[self.form]
+            "form": FORM_TO_STR_MAP[self.form]
         }
 
     def getArray(self):

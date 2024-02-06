@@ -11,15 +11,26 @@ from PySide6.QtGui import QAction, QColor, QIcon, QPalette, QPixmap, QRegularExp
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QApplication, QPushButton, QCheckBox, QComboBox,
     QHBoxLayout, QFormLayout, QGridLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
-    QMessageBox, QSplitter, QTabWidget, QToolBar, QWidget, QDial)
+    QMessageBox, QSpinBox, QDoubleSpinBox, QSplitter, QTabWidget, QToolBar, QWidget, QDial)
     
 import pyqtgraph as pg
 from typing import List
 
 SAMPLE_RATE = 44100
 IMAGE_DIR = "images"
+MAX_VOLUME = .25
+DURATION = 3
 
+# TODO: Do I need this regex?
 lineEditValidator = QRegularExpressionValidator(r"([0-9]+(_?[0-9])*\.[0-9]*(_?[0-9])*)|([0-9]*(_?[0-9])*\.[0-9]+(_?[0-9])*)")
+
+# Notes
+LETTERS = [
+    "A",  "A#", "B", "C", "C#", "D",
+    "D#", "E", "F", "F#", "G", "G#"
+]
+COMPUTED_NOTES = [440 * 2 ** (i / 12) for i in range(12)]
+NOTE_MAP = dict(zip(LETTERS, COMPUTED_NOTES))
 
 class MainWindow(QMainWindow):
     """
@@ -119,16 +130,17 @@ class WaveformWindow(QWidget):
         self.configContainer = QTabWidget()
         #self.addWaveButton = QPushButton("Add Waveform")
         #self.addWaveButton.clicked.connect(self.createWaveTab)
-        self.t = np.arange(0, 1, 1.0 / SAMPLE_RATE)
-        firstWaveform = waveform.Waveform(.25, 1, 440, 0, waveform.sine, SAMPLE_RATE)
+        self.t = np.arange(0, DURATION, 1.0 / SAMPLE_RATE)
+        firstWaveform = waveform.Waveform(1, DURATION, 440, 0, waveform.sine, SAMPLE_RATE)
         self.waveforms = [firstWaveform]
+        self.combined = np.sum(self.waveforms, axis=0) * MAX_VOLUME
+        self.soundPlayer = waveform.SoundPlayer(self.combined, sr=SAMPLE_RATE)
         self.addTab()
         self.plot()
         splitter = QSplitter(QtCore.Qt.Horizontal)
         splitter.addWidget(self.graphWidget)
         splitter.addWidget(self.configContainer)
         self.gridLayout.addWidget(splitter, 0, 0)
-        self.soundPlayer = waveform.SoundPlayer(np.sum(self.waveforms, axis=0), sr=SAMPLE_RATE)
 
     def playWaveform(self):
         """
@@ -145,25 +157,41 @@ class WaveformWindow(QWidget):
         """
         Call plot on graphWidget
         """
-        self.graphWidget.plot(self.t, self.waveforms)
+        self.plot_item = self.graphWidget.plot(self.t, self.combined)
 
-    def getCombinedWaves(self):
+    def updateWaveform(self):
         """
-        Get the sum of the waves from each of the tabs
-        TODO
         """
+        waveforms = self.getWaves()
+        self.combined = np.sum(waveforms, axis=0)
+        self.combined /= np.max(np.abs(self.combined))
+        self.graphWidget.clear()
+        self.plot()
+        self.soundPlayer.updateWaveform(self.combined, sr=SAMPLE_RATE)
+        self.soundPlayer.stop()
+        self.soundPlayer.play()
 
     def getWaves(self) -> List[waveform.Waveform]:
         """
         """
         self.configs = [self.configContainer.widget(i) for i in range(self.configContainer.count())]
-        
+        waveforms = []
+        for config in self.configs:
+            frequency = 2 ** (config.getOctave() - 4) * 2 ** (config.getCents() / 1200) * NOTE_MAP[config.getNote()]
+            phase = config.getPhase()
+            waveforms.append(waveform.Waveform(config.getAmplitude(), DURATION, frequency, phase, waveform.STRING_TO_FORM_MAP[config.getForm()]))
+        self.waveforms = waveforms
+        return self.waveforms
 
     def addTab(self):
         """
         """
-        self.configContainer.addTab(WaveformConfigWindow(), str(self.tabCounter + 1))
+        wcw = WaveformConfigWindow()
+        wcw.paramsChanged.connect(self.updateWaveform)
+        self.configContainer.addTab(wcw, str(self.tabCounter + 1))
         self.tabCounter += 1
+        self.updateWaveform()
+        self.configContainer.setCurrentIndex(self.configContainer.count() - 1)
 
     def deleteTab(self):
         """
@@ -174,6 +202,8 @@ class WaveformWindow(QWidget):
             None
         else:
             self.configContainer.removeTab(self.configContainer.currentIndex())
+            # Update waveform
+            self.updateWaveform()
 
     def nextTab(self):
         count = self.configContainer.count()
@@ -190,44 +220,64 @@ class WaveformWindow(QWidget):
 
 
 class WaveformConfigWindow(QWidget):
+    """
+    paramsChanged signal emitted to parent window (WaveformWindow)
+    """
+    paramsChanged = QtCore.Signal()
+
     def __init__(self):
         super().__init__()
         self.formLayout = QFormLayout(self)
-        self.ampDial, self.ampEdit, ampWidget = self._createHBoxRow("Amplitude")
-        self.freqDial, self.freqEdit, freqWidget = self._createHBoxRow("Frequency")
-        self.phaseDial, self.phaseEdit, phaseWidget = self._createHBoxRow("Phase Shift")
-        self.formLayout.setVerticalSpacing(1)
+        self.formLayout.setVerticalSpacing(3)
+
+        self.ampSpinBox = QDoubleSpinBox()
+        self.octaveSpinBox = QSpinBox()
+        self.phaseSpinBox = QDoubleSpinBox()
+        self.centsSpinBox = QSpinBox()
+
+        self.noteCombo = QComboBox()
+        self.noteCombo.addItems(LETTERS)
+
+        self.formCombo = QComboBox()
+        self.formCombo.addItems(list(waveform.STRING_TO_FORM_MAP.keys()))
 
         # Set minimum, maximum, and interval values for the parameter widgets
-        self.ampEdit.setValidator(lineEditValidator)
-        self.freqEdit.setValidator(lineEditValidator)
-        self.phaseEdit.setValidator(lineEditValidator)
+        self.ampSpinBox.setRange(1, 100)
+        self.octaveSpinBox.setRange(1, 9)
+        self.octaveSpinBox.setValue(3)
+        self.phaseSpinBox.setRange(0, 20000)
+        self.centsSpinBox.setRange(-99, 99)
 
-        self.ampEdit.setText("1")
-        self.ampEdit.setMaxLength(6)
-        self.freqEdit.setText("440")
-        self.freqEdit.setMaxLength(8)
-        self.phaseEdit.setText("0")
+        self.formLayout.addRow("Amplitude:", self.ampSpinBox)
+        self.formLayout.addRow("Octave:", self.octaveSpinBox)
+        self.formLayout.addRow("Phase Angle:", self.phaseSpinBox)
+        self.formLayout.addRow("Note:", self.noteCombo)
+        self.formLayout.addRow("Cents:", self.centsSpinBox)
+        self.formLayout.addRow("Waveform:", self.formCombo)
 
+        # Connect widgets to paramsChanged signal
+        self.ampSpinBox.valueChanged.connect(self.onParamsChanged)
+        self.octaveSpinBox.valueChanged.connect(self.onParamsChanged)
+        self.phaseSpinBox.valueChanged.connect(self.onParamsChanged)
+        self.centsSpinBox.valueChanged.connect(self.onParamsChanged)
+        self.formCombo.currentIndexChanged.connect(self.onParamsChanged)
+        self.noteCombo.currentIndexChanged.connect(self.onParamsChanged)
 
-        self.formLayout.addWidget(ampWidget)
-        self.formLayout.addWidget(freqWidget)
-        self.formLayout.addWidget(phaseWidget)
-        #self.
-
-    def _createHBoxRow(self, text):
-        qwidget = QWidget()
-        hBoxLayout = QHBoxLayout(qwidget)
-        text = QLabel(text)
-        dial = QDial()
-        dial.setWrapping(False)
-        
-        lineEdit = QLineEdit()
-        hBoxLayout.addWidget(text)
-        hBoxLayout.addWidget(dial)
-        hBoxLayout.addWidget(lineEdit)
-        return dial, lineEdit, qwidget
-
+    def onParamsChanged(self):
+        self.paramsChanged.emit()
+    
+    def getAmplitude(self) -> float:
+        return self.ampSpinBox.value()
+    def getOctave(self) -> int:
+        return self.octaveSpinBox.value()
+    def getPhase(self) -> float:
+        return self.phaseSpinBox.value()
+    def getNote(self) -> str:
+        return self.noteCombo.currentText()
+    def getCents(self) -> float:
+        return self.centsSpinBox.value()
+    def getForm(self) -> str:
+        return self.formCombo.currentText()
 
 
 class GraphWidget(QWidget):
@@ -246,11 +296,14 @@ class GraphWidget(QWidget):
         self.gridLayout.addWidget(self.graph, 0, 0)
         self.gridLayout.addWidget(self.graphButtonWidget, 1, 0)
 
-    def plot(self, t, waveforms):
+    def plot(self, t, waveform):
         hPen = pg.mkPen("#0099bb", width=3)
         fPen = pg.mkPen("r", width=3)
-        self.graph.plot(t, np.sum(waveforms, axis=0), pen=hPen)
+        self.graph.plot(t, waveform, pen=hPen)
         #self.graph.setMinimumWidth(self.graphWidget.height())
+
+    def clear(self):
+        self.graph.clear()
 
 
 
