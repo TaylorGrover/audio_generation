@@ -1,12 +1,12 @@
-import librosa
-import librosa.display
+#import librosa
+#import librosa.display
 import matplotlib.pyplot as plt
 from note_structure import *
 import numpy as np
 import soundfile as sf
 import time
 from util import *
-from waveforms import *
+from waveform import *
 
 
 def aug_note(vol, duration, hz, sr):
@@ -34,7 +34,7 @@ def fade_out(audio, seconds_from_end, sr):
     n = len(audio)
     if seconds_from_end * sr >= n:
         return audio
-    start_index = n - seconds_from_end * sr
+    start_index = int(n - seconds_from_end * sr)
     fade = np.concatenate((audio[:start_index], audio[start_index:] - audio[start_index:] * np.arange(0, 1, 1 / (n - start_index)).reshape(-1, 1)))
     return fade
 
@@ -87,7 +87,10 @@ def harmonics(vol, duration, hz, sr, n, key="minor"):
     """
     funcs = [sine, sawtooth, square, triangular]
     t = np.arange(0, duration, 1.0 / sr)
-    frequencies = get_frequencies(key, hz)
+    if type(key) is str:
+        frequencies = get_frequencies(key, hz)
+    if type(key) is list:
+        frequencies = get_notes(hz, key)
     output = np.sum(np.array([pan(np.random.choice(funcs)(vol, duration, np.random.choice(frequencies) + np.sin(np.random.random() * t), sr, shift=.4 * np.random.random() - .2), direction=np.random.random()) for i in range(n)]), axis=0)
     rescaled = output / np.max(np.abs(output))
     return rescaled
@@ -135,15 +138,97 @@ def stereo_test(sample_rate):
 
 def soul_hemorrhage(sample_rate, bpm):
     n = 100
-    sample1 = harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="major")
-    sample2 = harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="major")
-    sample3 = harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="power")
-    sample4 = harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-1 / 6), sample_rate, n, key="power")
-    sample5 = harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="power")
-    sample6 = harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="power")
-    sample7 = harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (5 / 12), sample_rate, n, key="minor")
-    sample8 = harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 4), sample_rate, n, key="major")
-    audio = np.concatenate((sample1, sample2, sample3, sample4, sample5, sample4, sample6, sample1, sample7, sample8))
+    sequence = [
+
+        harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="major")
+        , harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="power")
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-1 / 6), sample_rate, n, key="power")
+        , harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="power")
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-1 / 6), sample_rate, n, key="power")
+        , harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="power")
+        , harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="major")
+        , harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (5 / 12), sample_rate, n, key="minor")
+        , harmonics(1, 4 / (bpm / 60), 293.66 * 2 ** (1 / 4), sample_rate, n, key="major")
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="minor")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="minor")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (5 / 12), sample_rate, n, key="sus")
+        , harmonics(1, 3 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="power")
+        , harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="power")
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .25 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="minor")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , fade_out(harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="power"), .05, sample_rate)
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="minor")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key="sus")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (5 / 12), sample_rate, n, key="sus")
+
+        , harmonics(1, 3 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key="power")
+        , harmonics(1, 4 / (bpm / 60), 293.66, sample_rate, n, key="power")
+        , harmonics(1, 3 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="fourth")
+        , harmonics(1, 2 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, 2 / (bpm / 60), 293.66, sample_rate, n, key="fourth")
+        , harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 10])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 7])
+        , harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key=[0, 7])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (-4 / 12), sample_rate, n, key=[0, 4, 7])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (4 / 12), sample_rate, n, key=[0, 7])
+
+        , harmonics(1, 3 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, .5 / (bpm / 60), 293.66, sample_rate, n, key="fourth")
+        , harmonics(1, 2 / (bpm / 60), 293.66, sample_rate, n, key="major")
+        , harmonics(1, 2 / (bpm / 60), 293.66, sample_rate, n, key="fourth")
+        , harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, .5 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 10])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (-2 / 12), sample_rate, n, key=[0, 7])
+        , harmonics(1, 3 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key=[0, 9])
+        , harmonics(1, 1 / (bpm / 60), 293.66 * 2 ** (1 / 12), sample_rate, n, key=[0, 7])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (-4 / 12), sample_rate, n, key=[0, 4, 7])
+        , harmonics(1, 2 / (bpm / 60), 293.66 * 2 ** (4 / 12), sample_rate, n, key=[0, 7])
+
+    ]
+    audio = np.concatenate(sequence)
     faded = fade_out(audio, 1, sample_rate)
     sf.write("audio/hemorrhage.wav", faded, sample_rate)
 
@@ -152,8 +237,8 @@ if __name__ == "__main__":
     sample_rate = 44100
     bpm = 120
 
-    #soul_hemorrhage(sample_rate, 155)
-    audio = wave_combo(2, sample_rate, 440, 440 * 2 ** (7 / 12), 440 * 2 ** (1 / 4), 440 * 2)
+    audio = soul_hemorrhage(sample_rate, 155)
+    #audio = wave_combo(2, sample_rate, 440, 440 * 2 ** (7 / 12), 440 * 2 ** (1 / 4), 440 * 2)
     sf.write("audio/test.wav", audio, sample_rate)
     plt.ion()
     #spec = librosa.feature.melspectrogram(y=audio, sr=sample_rate, n_mels=128)

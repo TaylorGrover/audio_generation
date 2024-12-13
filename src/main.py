@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         editMenu = self.menuBar().addMenu("&Edit")
         viewMenu = self.menuBar().addMenu("&View")
 
+        insertSampleAction = QAction("&Add Sample", self, shortcut="Insert", triggered=self.insertSample)
         exitAction = QAction("&Exit", self, shortcut="Ctrl+Q", triggered=self.close)
         fullScreenAction = QAction("&Fullscreen", self, shortcut="F11", triggered=self.maximize)
         addTabAction = QAction("&AddTab", self, shortcut="Ctrl+A", triggered=self.addWave)
@@ -94,6 +95,12 @@ class MainWindow(QMainWindow):
         self.palette.setColor(QPalette.Disabled, QPalette.Base, QColor(49, 49, 49))
         self.setPalette(self.palette)
 
+    def insertSample(self):
+        """
+        Accept WAV, MP3, or OGG
+        """
+        print("Insert")
+
     def maximize(self):
         if self.maximized:
             self.showNormal()
@@ -131,9 +138,11 @@ class WaveformWindow(QWidget):
         #self.addWaveButton = QPushButton("Add Waveform")
         #self.addWaveButton.clicked.connect(self.createWaveTab)
         self.t = np.arange(0, DURATION, 1.0 / SAMPLE_RATE)
-        firstWaveform = waveform.Waveform(1, DURATION, 440, 0, waveform.sine, SAMPLE_RATE)
+        firstWaveform = waveform.Waveform(1, DURATION, 0, 0, waveform.sine, SAMPLE_RATE)
+        print(firstWaveform)
         self.waveforms = [firstWaveform]
         self.combined = np.sum(self.waveforms, axis=0) * MAX_VOLUME
+        print(self.combined)
         self.soundPlayer = waveform.SoundPlayer(self.combined, sr=SAMPLE_RATE)
         self.addTab()
         self.plot()
@@ -168,8 +177,9 @@ class WaveformWindow(QWidget):
         self.graphWidget.clear()
         self.plot()
         self.soundPlayer.updateWaveform(self.combined, sr=SAMPLE_RATE)
-        self.soundPlayer.stop()
-        self.soundPlayer.play()
+        if self.playStarted:
+            self.soundPlayer.stop()
+            self.soundPlayer.play()
 
     def getWaves(self) -> List[waveform.Waveform]:
         """
