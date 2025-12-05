@@ -1,0 +1,23 @@
+\documentclass{article}
+\usepackage{tikz}  % To draw the T accounts
+\usepackage{amsmath}  % For math symbols
+\usepackage{array}  % For more control over tables
+\usepackage[margin=1in, top=0.5in]{geometry}  % Adjust margins
+\usepackage{multicol}  % For two-column layout
+\usepackage[12pt]{extsizes}
+
+\begin{document}
+
+At a collision:
+$$m_1v_{1i}+m_2v_{2i}=m_1v_{1f}+m_2v_{2f}$$
+
+At each step, reduce the velocity by some constant fraction:
+
+$$\frac{1}{2}m_1v_{1f}^2+\frac{1}{2}m_2v_{2f}^2=k\left(\frac{1}{2}m_1v_{1i}^2+\frac{1}{2}m_2v_{2i}^2\right)$$
+$$\implies m_1v_{1f}^2+m_2v_{2f}^2=k\left(m_1v_{1i}^2+m_2v_{2i}^2\right)$$
+
+The final velocities calculated from the collision:
+$$v_{1f}=\frac{m_1-m_2}{m_1+m_2}v_{1i}+\frac{2m_2}{m_1+m_2}v_{2i}$$
+$$v_{2f}=\frac{2m_1}{m_1+m_2}v_{1i}+\frac{m_2-m_1}{m_1+m_2}v_{2i}$$
+\end{document}
+

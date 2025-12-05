@@ -1,0 +1,9 @@
+#! /bin/bash
+
+:' latex $1
+dvipdf ${1%.tex}.dvi
+rm -f *dvi *aux *log
+#google-chrome-stable ${1%.tex}.pdf '
+latex equations.tex
+dvipdf equations.dvi
+rm -f *dvi *aux *log

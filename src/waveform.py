@@ -62,7 +62,8 @@ def play(waveform, sr=44100):
     url = QUrl.fromLocalFile(path)
     effect = QSoundEffect()
     effect.setSource(url)
-    effect.setLoopCount(QSoundEffect.Infinite)
+    print(QSoundEffect.Loop.Infinite.value)
+    effect.setLoopCount(QSoundEffect.Loop.Infinite.value)
     effect.play()
     os.remove(path)
     return effect
@@ -82,7 +83,7 @@ class SoundPlayer:
 
     loopCount : QSoundEffect int
         If 0 or 1, it will play once. The default behavior is to play 
-        infinitely, as specified by QSoundEffect.Infinite.
+        infinitely, as specified by QSoundEffect.Loop.Infinite.
 
     Attributes:
     -----------
@@ -94,12 +95,13 @@ class SoundPlayer:
 
     
     """
-    def __init__(self, waveform, sr=None, loopCount=QSoundEffect.Loop.Infinite):
+    def __init__(self, waveform, sr=None, loopCount=QSoundEffect.Loop.Infinite.value):
         self.chars = list(string.ascii_letters)
         self.base_dir = os.path.join(AUDIO_DIR, "tmp")
         self.updateWaveform(waveform, sr=sr)
 
         self.loopCount = loopCount
+        print(dir(self.loopCount))
         self.started = False
     def play(self) -> None:
         if not self.started:

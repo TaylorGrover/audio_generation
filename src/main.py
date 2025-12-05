@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self.waveformWindow.addAction(prevTabAction)
 
         self.setCentralWidget(self.waveformWindow)
-        self.maximized = True
+        self.maximized = False
         self.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
         self.createPalette()
 
