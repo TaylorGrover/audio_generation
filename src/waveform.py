@@ -12,6 +12,15 @@ import string
 
 AUDIO_DIR = "audio"
 
+def integrate(f, a, b, n):
+    dx = (b - a) / n
+    total = 0
+    x_i = a + dx / 2
+    while x_i < b:
+        total += f(x_i) * dx
+        x_i += dx
+    return total
+
 def sine(vol, duration, hz, sr, shift=0):
     assert duration > 0, "Must have positive duration"
     assert sr > 0, "Must have positive sample rate"
@@ -44,6 +53,52 @@ def triangular(vol, duration, hz, sr, shift=0):
     assert duration > 0
     t = np.arange(0, duration, 1.0 / sr)
     return 2 / np.pi * np.arcsin(np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift))
+
+
+def random(vol, duration, hz, sr, shift=0, n=50):
+    assert duration > 0, "Duration must be greater than 0"
+    t = np.arange(0, duration, 1.0 / sr)
+    s = np.random.uniform(-1, 1, n)
+    s = np.concatenate((s, [s[0]]))
+    wavelength = 1.0 / hz
+    t_norm = t - wavelength * np.floor(t / wavelength)
+    j = np.ceil(t_norm * n / wavelength).astype(int)
+    y = n / wavelength * (s[j] - s[j - 1]) * (t_norm - (j - 1) * wavelength / n) + s[j - 1]
+    return vol * y / np.max(np.abs(y))
+
+def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
+    assert duration > 0, "Duration must be greater than 0"
+    wavelength = 1.0 / hz
+    t = np.arange(0, wavelength, 1.0 / sr)
+    s = np.random.uniform(-1, 1, n)
+    s = np.concatenate((s, [s[0]]))
+    def s_func(t):
+        t_norm = t - wavelength * np.floor(t / wavelength)
+        j = np.ceil(t_norm * n / wavelength).astype(int)
+        return n / wavelength * (s[j] - s[j-1]) * (t_norm - (j - 1) * wavelength / n) + s[j-1]
+    j = np.array([i for i in range(1, n)])
+    coefficients = []
+    coefficients_test = []
+    for k in range(1, M + 1):
+        left = 2 * np.pi * k * (j - 1) / n
+        right = 2 * np.pi * k * j / n
+        coeff = np.sum(-s[j] / (np.pi * k) * np.cos(right) + n / (2 * np.pi ** 2 * k ** 2) * (s[j] - s[j-1]) * (np.sin(right) - np.sin(left)))
+        coefficients_test.append(coeff)
+    for k in range(1, M+1):
+        f = lambda t: s_func(t) * np.sin(2 * np.pi * k * t / wavelength)
+        coefficients.append(integrate(f, 0, wavelength, 1000))
+    print(coefficients_test)
+    print(coefficients)
+    t = np.arange(0, duration, 1.0 / sr)
+    t_norm = t - wavelength * np.floor(t / wavelength)
+    j = np.ceil(t_norm * n / wavelength).astype(int)
+    y_sharp = s_func(t)
+    y_sharp /= np.max(np.abs(y_sharp))
+    y_smooth = np.sum(list(map(lambda k: coefficients[k] * np.sin(2 * np.pi * (k+1) * t / wavelength), [i for i in range(len(coefficients))])), axis=0)
+    y_smooth_test = np.sum(list(map(lambda k: coefficients_test[k] * np.sin(2 * np.pi * (k + 1) * t / wavelength), [i for i in range(len(coefficients_test))])), axis=0)
+    y_smooth /= np.max(np.abs(y_smooth))
+    y_smooth_test /= np.max(np.abs(y_smooth_test))
+    return y_sharp, y_smooth, y_smooth_test
 
 FORM_TO_STR_MAP = {
     sine: "sine",
@@ -214,4 +269,13 @@ class Waveform:
 
 if __name__ == "__main__":
     sr = 44100
+    t = np.arange(0, .02, 1.0 / sr)
+    y_sharp, y, y_test = random_smoothed(1, .02, 440, 44100, 0, 50, 100)
+    fig, ax = plt.subplots(figsize=(16, 9))
+    ax.plot(t, y_sharp)
+    ax.plot(t, y)
+    ax.plot(t, y_test)
+    sf.write("audio/tests/y_sharp.mp3", y_sharp, sr)
+    sf.write("audio/tests/y_smooth.mp3", y, sr)
+    sf.write("audio/tests/y_smooth_test.mp3", y_test, sr)
 
