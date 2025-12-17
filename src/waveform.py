@@ -2,7 +2,6 @@ from PySide6.QtCore import QUrl
 from PySide6.QtMultimedia import QSoundEffect
 import glob
 import matplotlib.pyplot as plt
-plt.ion()
 import numpy as np
 import os
 import shutil
@@ -12,12 +11,12 @@ import string
 
 AUDIO_DIR = "audio"
 
+
 def sine(vol, duration, hz, sr, shift=0):
     assert duration > 0, "Must have positive duration"
     assert sr > 0, "Must have positive sample rate"
     t = np.arange(0, duration, 1.0 / sr)
     return vol * np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift)
-
 
 
 def square(vol, duration, hz, sr, shift=0):
@@ -44,6 +43,29 @@ def triangular(vol, duration, hz, sr, shift=0):
     assert duration > 0
     t = np.arange(0, duration, 1.0 / sr)
     return 2 / np.pi * np.arcsin(np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift))
+
+def random_waveform(vol, duration, hz, sr, shift=0, n_points=10, sine_count=100):
+    wavelength = 1.0 / hz
+    s = np.random.uniform(-1, 1, n_points)
+    s = np.concatenate((s, [s[0]]))
+    t = np.linspace(0, duration, int(sr * duration))
+    coefficients = np.zeros(sine_count)
+    ms = (s[1:] - s[:-1]) * n_points / wavelength
+    js = np.array([i for i in range(1, n_points + 1)])
+    lowers = (js - 1) * wavelength / n_points
+    uppers = js * wavelength / n_points
+    wave = np.zeros_like(t)
+    for k in range(1, sine_count + 1):
+        alpha_k = 2 * np.pi * k / wavelength
+        segments = -(ms * wavelength / (alpha_k * n_points) + s[:-1] / alpha_k) * np.cos(alpha_k * uppers) + s[:-1] * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
+        wave += coefficients[k - 1] * np.sin(alpha_k * t)
+    plt.plot(t, np.interp(t % wavelength, np.linspace(0, wavelength, n_points + 1), s))
+    plt.plot(t, wave * vol / np.max(np.abs(wave)))
+    plt.show()
+
+    return vol * wave
+
 
 FORM_TO_STR_MAP = {
     sine: "sine",
