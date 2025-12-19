@@ -42,14 +42,21 @@ def sawtooth(vol, duration, hz, sr, shift=0, form="positive"):
 def triangular(vol, duration, hz, sr, shift=0):
     assert duration > 0
     t = np.arange(0, duration, 1.0 / sr)
-    return 2 / np.pi * np.arcsin(np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift))
+    return vol * 2 / np.pi * np.arcsin(np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift))
 
-def random_waveform(vol, duration, hz, sr, shift=0, n_points=10, sine_count=100):
-    wavelength = 1.0 / hz
+def combined_random_waveforms(vol, duration, frequencies, sr, shift=0, n_points=30, sine_count=20):
     s = np.random.uniform(-1, 1, n_points)
     s = np.concatenate((s, [s[0]]))
     t = np.linspace(0, duration, int(sr * duration))
+    wave = np.zeros_like(t)
+    for freq in frequencies:
+        wave += random_waveform(vol, freq, t, s, sine_count)
+    return vol * wave / np.max(np.abs(wave))
+
+def random_waveform(vol, hz, t, s, sine_count=100):
+    wavelength = 1.0 / hz
     coefficients = np.zeros(sine_count)
+    n_points = len(s) - 1
     ms = (s[1:] - s[:-1]) * n_points / wavelength
     js = np.array([i for i in range(1, n_points + 1)])
     lowers = (js - 1) * wavelength / n_points
