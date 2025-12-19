@@ -57,13 +57,10 @@ def random_waveform(vol, duration, hz, sr, shift=0, n_points=10, sine_count=100)
     wave = np.zeros_like(t)
     for k in range(1, sine_count + 1):
         alpha_k = 2 * np.pi * k / wavelength
-        segments = -(ms * wavelength / (alpha_k * n_points) + s[:-1] / alpha_k) * np.cos(alpha_k * uppers) + s[:-1] * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        segments = -(ms * wavelength / (alpha_k * n_points) + s[:-1] / alpha_k) * np.cos(alpha_k * uppers) + s[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
         coefficients[k - 1] = 2 / wavelength * np.sum(segments)
         wave += coefficients[k - 1] * np.sin(alpha_k * t)
-    plt.plot(t, np.interp(t % wavelength, np.linspace(0, wavelength, n_points + 1), s))
-    plt.plot(t, wave * vol / np.max(np.abs(wave)))
-    plt.show()
-
+    wave = vol * wave / np.max(np.abs(wave))
     return vol * wave
 
 
@@ -72,6 +69,7 @@ FORM_TO_STR_MAP = {
     square: "square",
     sawtooth: "sawtooth",
     triangular: "triangular",
+    random_waveform: "random",
 }
 
 STRING_TO_FORM_MAP = dict((FORM_TO_STR_MAP[form], form) for form in FORM_TO_STR_MAP)
