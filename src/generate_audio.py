@@ -646,14 +646,14 @@ def soul_hemorrhage(sample_rate, bpm):
     ]
     audio = np.concatenate(sequence)
     #audio = fade_out(audio, 1, sample_rate)
-    sf.write("audio/hemorrhage.wav", audio, sample_rate)
+    sf.write("audio/fast_hemorrhage.wav", audio, sample_rate)
 
 
 if __name__ == "__main__":
     sample_rate = 44100
     bpm = 120
 
-    soul_hemorrhage(sample_rate, 155)
+    soul_hemorrhage(sample_rate, 255)
     audio = wave_combo(2, sample_rate, 440, 440 * 2 ** (7 / 12), 440 * 2 ** (1 / 4), 440 * 2)
     sf.write("audio/test.wav", audio, sample_rate)
     plt.ion()

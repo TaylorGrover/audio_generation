@@ -7,10 +7,21 @@ import os
 import shutil
 import soundfile as sf
 import string
+import sys
+import time
 
+np.random.seed(0)
 
 AUDIO_DIR = "audio"
 
+def integrate(f, a, b, n):
+    dx = (b - a) / n
+    total = 0
+    x_i = a + dx / 2
+    while x_i < b:
+        total += f(x_i) * dx
+        x_i += dx
+    return total
 
 def sine(vol, duration, hz, sr, shift=0):
     assert duration > 0, "Must have positive duration"
@@ -50,33 +61,87 @@ def combined_random_waveforms(vol, duration, frequencies, sr, shift=0, n_points=
     t = np.linspace(0, duration, int(sr * duration))
     wave = np.zeros_like(t)
     for freq in frequencies:
-        wave += random_waveform(vol, freq, t, s, sine_count)
+        wave += seeded_waveform(vol, freq, t, s, sine_count)
     return vol * wave / np.max(np.abs(wave))
 
-def random_waveform(vol, hz, t, s, sine_count=100):
+def seeded_waveform(vol, hz, t, seed, sine_count=100):
     wavelength = 1.0 / hz
     coefficients = np.zeros(sine_count)
     n_points = len(s) - 1
-    ms = (s[1:] - s[:-1]) * n_points / wavelength
+    ms = (seed[1:] - seed[:-1]) * n_points / wavelength
     js = np.array([i for i in range(1, n_points + 1)])
     lowers = (js - 1) * wavelength / n_points
     uppers = js * wavelength / n_points
     wave = np.zeros_like(t)
     for k in range(1, sine_count + 1):
         alpha_k = 2 * np.pi * k / wavelength
-        segments = -(ms * wavelength / (alpha_k * n_points) + s[:-1] / alpha_k) * np.cos(alpha_k * uppers) + s[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        segments = -(ms * wavelength / (alpha_k * n_points) + seed[:-1] / alpha_k) * np.cos(alpha_k * uppers) + seed[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
         coefficients[k - 1] = 2 / wavelength * np.sum(segments)
         wave += coefficients[k - 1] * np.sin(alpha_k * t)
     wave = vol * wave / np.max(np.abs(wave))
     return vol * wave
 
 
+
+def random(vol, duration, hz, sr, shift=0, n=50):
+    assert duration > 0, "Duration must be greater than 0"
+    t = np.arange(0, duration, 1.0 / sr)
+    s = np.random.uniform(-1, 1, n)
+    s = np.concatenate((s, [s[0]]))
+    wavelength = 1.0 / hz
+    t_norm = t - wavelength * np.floor(t / wavelength)
+    j = np.ceil(t_norm * n / wavelength).astype(int)
+    y = n / wavelength * (s[j] - s[j - 1]) * (t_norm - (j - 1) * wavelength / n) + s[j - 1]
+    return vol * y / np.max(np.abs(y))
+
+
+def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
+    assert duration > 0, "Duration must be greater than 0"
+    wavelength = 1.0 / hz
+    t = np.arange(0, duration, 1.0 / sr)
+    s = np.random.uniform(-1, 1, n)
+    s = np.concatenate((s, [s[0]]))
+    js = np.array([i for i in range(1, n + 1)])
+    lowers = (js - 1) * wavelength / n
+    uppers = js * wavelength / n
+    ms = n / wavelength * (s[1:] - s[:-1])
+    coefficients = np.zeros(M)
+    wave = np.zeros_like(t)
+    for k in range(1, M + 1):
+        alpha_k = 2 * np.pi * k / wavelength
+        segments = -1 / alpha_k * (ms * wavelength / n + s[:-1]) * np.cos(alpha_k * uppers) + s[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
+        wave += coefficients[k - 1] * np.sin(alpha_k * t)
+    #plt.plot(t, np.interp(t, np.linspace(0, 1.0/wavelength, len(s) - 1), s[:-1], period=1/wavelength))
+    return t, s, wave 
+
+
+def echo(signal: np.ndarray, dist: float, decay, sr: int):
+    # Dist in meters
+    if len(signal.shape) > 1 and signal.shape[1] > 2:
+        # Permit panned sounds
+        raise ValueError("Expected an ndarray with shape of (n,), (n, 1), or (n, 2)")
+    v_sound = 343
+    dt = 2 * dist / v_sound
+    sample_window = int(sr * dt)
+    extension = np.concatenate((signal, np.zeros(len(signal))))
+    
+    index = 0
+    start = time.time()
+    while index < len(signal):
+        extension[index+sample_window:index+2*sample_window] += extension[index:index+sample_window] * decay
+        index += 1
+        print("%.2f" % (time.time() - start), end="\r")
+        sys.stdout.flush()
+    print()
+    return extension
+
 FORM_TO_STR_MAP = {
     sine: "sine",
     square: "square",
     sawtooth: "sawtooth",
     triangular: "triangular",
-    random_waveform: "random",
+    seeded_waveform: "seeded",
 }
 
 STRING_TO_FORM_MAP = dict((FORM_TO_STR_MAP[form], form) for form in FORM_TO_STR_MAP)
@@ -241,4 +306,12 @@ class Waveform:
 
 if __name__ == "__main__":
     sr = 44100
+    t = np.arange(0, 5, 1.0 / sr)
+    y_smooth = random_smoothed(1, 5, 440, sr, 0, 50, 100)
+    y_smooth_low = random_smoothed(1, 5, 220, sr, 0, 11, 10)
+    y = y_smooth_low + y_smooth
+    echoed = echo(y, 63, .5, sr)
+    echoed_norm = echoed / np.max(np.abs(echoed))
+    sf.write("audio/tests/y_smooth.wav", y_smooth, sr)
+    sf.write("audio/tests/echoed.wav", echoed, sr)
 
