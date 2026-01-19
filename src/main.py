@@ -151,6 +151,8 @@ class WaveformWindow(QWidget):
         splitter.addWidget(self.configContainer)
         self.gridLayout.addWidget(splitter, 0, 0)
 
+        self.graphWidget.playButton.clicked.connect(self.playWaveform)
+
     def playWaveform(self):
         """
         Implement
@@ -158,9 +160,11 @@ class WaveformWindow(QWidget):
         if not self.playStarted:
             self.soundPlayer.play()
             self.playStarted = True
+            self.graphWidget.playButton.setText("Stop")
         else:
             self.playStarted = False
             self.soundPlayer.stop()
+            self.graphWidget.playButton.setText("Play")
 
     def plot(self):
         """

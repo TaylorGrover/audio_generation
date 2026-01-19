@@ -4,6 +4,7 @@ import glob
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import scipy.fft as fft
 import shutil
 import soundfile as sf
 import string
@@ -61,13 +62,14 @@ def combined_random_waveforms(vol, duration, frequencies, sr, shift=0, n_points=
     t = np.linspace(0, duration, int(sr * duration))
     wave = np.zeros_like(t)
     for freq in frequencies:
-        wave += seeded_waveform(vol, freq, t, s, sine_count)
+        wave += seeded_waveform(vol, duration, freq, s, sr, sine_count)
     return vol * wave / np.max(np.abs(wave))
 
-def seeded_waveform(vol, hz, t, seed, sine_count=100):
+def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
+    t = np.linspace(0, duration, int(sr * duration))
     wavelength = 1.0 / hz
     coefficients = np.zeros(sine_count)
-    n_points = len(s) - 1
+    n_points = len(seed) - 1
     ms = (seed[1:] - seed[:-1]) * n_points / wavelength
     js = np.array([i for i in range(1, n_points + 1)])
     lowers = (js - 1) * wavelength / n_points
@@ -82,6 +84,81 @@ def seeded_waveform(vol, hz, t, seed, sine_count=100):
     return vol * wave
 
 
+
+def delay(audio, samples_ahead, num_delays=4, decay_fraction=.8, decay_base=2, sr=44100):
+    """
+    Here's the idea: take a signal and add some number of delays some multiples
+    of the `samples_ahead`. At each multiple exponentiate the decay base by the 
+    index distance from the start.
+    """
+    indexes = [(i + 1) * int(samples_ahead) for i in range(num_delays)]
+    n = len(audio)
+    delayed = np.concatenate((audio, np.zeros((num_delays * int(samples_ahead), audio.shape[1]))))
+    # For testing purposes try to filter out all frequencies between 20 Hz and 200 Hz
+    for i, index in enumerate(indexes):
+        decay_amount = decay_fraction / decay_base ** i
+        delayed[index:index+n] += decay_amount * audio
+    delayed /= np.max(np.abs(delayed))
+    return delayed
+
+def filtered_delay(
+    audio: np.ndarray,
+    samples_ahead: int,
+    low_freq,
+    high_freq,
+    filter_fraction,
+    num_delays: int=4,
+    decay_fraction: float=0.8,
+    decay_base: float=2,
+    sr: int=44100
+):
+    indexes = [(i + 1) * int(samples_ahead) for i in range(num_delays)]
+    n = len(audio)
+    delayed = np.concatenate((audio, np.zeros((num_delays * int(samples_ahead), audio.shape[1]))))
+    filtered = hard_filter(audio, low_freq, high_freq, filter_fraction, sr)
+    for i, index in enumerate(indexes):
+        decay_amount = decay_fraction / decay_base ** i
+        delayed[index:index+n] += decay_amount * filtered
+        filtered = hard_filter(filtered, low_freq, high_freq, filter_fraction, sr)
+    delayed /= np.max(np.abs(delayed))
+    return delayed
+
+
+def hard_filter(audio: np.ndarray, lower_freq, upper_freq, fraction, sr):
+    """
+    Use FFT to adjust specified frequency amplitudes
+    """
+    frequencies = fft.fft(audio, axis=0)
+    n = len(audio)
+    lower_index = int(lower_freq * n / sr)
+    upper_index = int(upper_freq * n / sr)
+    freq_filter = np.ones((n // 2, 2))
+    freq_filter[lower_index:upper_index+1] = fraction
+    frequencies[:n//2] *= freq_filter
+    frequencies[n//2:] *= freq_filter[::-1]
+    filtered = fft.ifft(frequencies, axis=0).real
+    filtered /= np.max(np.abs(filtered))
+    return filtered
+
+
+def fade_out(audio, seconds_from_end, sr):
+    """
+    
+    """
+    n = len(audio)
+    if seconds_from_end * sr >= n:
+        return audio
+    start_index = int(n - seconds_from_end * sr)
+    fade = np.concatenate((audio[:start_index], audio[start_index:] - audio[start_index:] * np.arange(0, 1, 1 / (n - start_index)).reshape(-1, 1)))
+    return fade
+
+
+def sine_sweep(duration, low, high, sr):
+    t_ir = np.linspace(0, duration, int(duration * sr))
+    return np.sin(2 * np.pi * ((high - low) / duration * t_ir + low) * t_ir)
+
+def eff_sweep(duration, low, high, sr):
+    return play(sine_sweep(duration, low, high, sr), sr=sr)
 
 def random(vol, duration, hz, sr, shift=0, n=50):
     assert duration > 0, "Duration must be greater than 0"
@@ -149,15 +226,15 @@ STRING_TO_FORM_MAP = dict((FORM_TO_STR_MAP[form], form) for form in FORM_TO_STR_
 def play(waveform, sr=44100):
     chars = [char for char in string.ascii_letters]
     name = "".join(np.random.choice(chars, 8, replace=True)) + ".wav"
-    path = os.path.join(AUDIO_DIR, name)
+    path = os.path.join(AUDIO_DIR, "tmp", name)
     sf.write(path, waveform, sr)
     url = QUrl.fromLocalFile(path)
     effect = QSoundEffect()
     effect.setSource(url)
     print(QSoundEffect.Loop.Infinite.value)
-    effect.setLoopCount(QSoundEffect.Loop.Infinite.value)
-    effect.play()
-    os.remove(path)
+    effect.setLoopCount(0)
+    #effect.play()
+    #effect.stop()
     return effect
 
 
@@ -193,7 +270,6 @@ class SoundPlayer:
         self.updateWaveform(waveform, sr=sr)
 
         self.loopCount = loopCount
-        print(dir(self.loopCount))
         self.started = False
     def play(self) -> None:
         if not self.started:
@@ -305,13 +381,8 @@ class Waveform:
 
 
 if __name__ == "__main__":
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(16, 9))
     sr = 44100
-    t = np.arange(0, 5, 1.0 / sr)
-    y_smooth = random_smoothed(1, 5, 440, sr, 0, 50, 100)
-    y_smooth_low = random_smoothed(1, 5, 220, sr, 0, 11, 10)
-    y = y_smooth_low + y_smooth
-    echoed = echo(y, 63, .5, sr)
-    echoed_norm = echoed / np.max(np.abs(echoed))
-    sf.write("audio/tests/y_smooth.wav", y_smooth, sr)
-    sf.write("audio/tests/echoed.wav", echoed, sr)
+    
 

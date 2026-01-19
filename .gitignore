@@ -1,0 +1,4 @@
+*.reapeaks
+audio/tmp/*
+audio/tests
+__pycache__
