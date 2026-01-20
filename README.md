@@ -14,12 +14,6 @@ After installing all requirements in the python virtual environment, run
 $ pytest
 ```
 
-```python
-import numpy as np
-def f(x: int) -> int:
-    return x * 2
-```
-
 ## Sine Series of Random Points Over Equally-Spaced Intervals
 $$
 s=[s_1,...,s_n]
@@ -46,7 +40,7 @@ s_j(t)=\frac{n}{\lambda}\left(s_{j+1}-s_j\right)(t-a_j)+s_j
 $$
 
 $$
-A_k=\frac{2}{\lambda}\sum_{j=1}^n\int_{a_j}^{b_j}\left(m_j(t-a_j)+s_j\right)\sin(\alpha_k t)\mathop{dt}=\frac{2}{\lambda}\sum_{j=1}^n\left[-\frac{1}{\alpha_k}\left(m_j(t-a_j)+s_j\right)\cos(\alpha_kb_j)+\frac{m_j}{\alpha_k^2}\sin(\alpha_kt)\right]_{a_j}^{b_j}
+A_k=\frac{2}{\lambda}\sum_{j=1}^n\int_{a_j}^{b_j}\left(m_j(t-a_j)+s_j\right)\sin(\alpha_k t)\mathop{dt}=\frac{2}{\lambda}\sum_{j=1}^n\left[-\frac{1}{\alpha_k}\left(m_j(t-a_j)+s_j\right)\cos(\alpha_kt)+\frac{m_j}{\alpha_k^2}\sin(\alpha_kt)\right]_{a_j}^{b_j}
 $$
 
 $$
