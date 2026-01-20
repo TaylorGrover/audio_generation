@@ -19,3 +19,8 @@ import numpy as np
 def f(x: int) -> int:
     return x * 2
 ```
+
+## Sine Series of Random Points Over Equally-Spaced Intervals
+$$
+s=[s_1,...,s_n]
+$$
