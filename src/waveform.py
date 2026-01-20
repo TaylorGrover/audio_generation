@@ -64,10 +64,10 @@ def combined_random_waveforms(vol, duration, frequencies, sr, shift=0, n_points=
         wave += seeded_waveform(vol, freq, t, s, sine_count)
     return vol * wave / np.max(np.abs(wave))
 
-def seeded_waveform(vol, hz, t, seed, sine_count=100):
+def seeded_waveform(vol, hz: [float, callable], t, seed, sine_count=100):
     wavelength = 1.0 / hz
     coefficients = np.zeros(sine_count)
-    n_points = len(s) - 1
+    n_points = len(seed) - 1
     ms = (seed[1:] - seed[:-1]) * n_points / wavelength
     js = np.array([i for i in range(1, n_points + 1)])
     lowers = (js - 1) * wavelength / n_points
@@ -155,9 +155,7 @@ def play(waveform, sr=44100):
     effect = QSoundEffect()
     effect.setSource(url)
     print(QSoundEffect.Loop.Infinite.value)
-    effect.setLoopCount(QSoundEffect.Loop.Infinite.value)
-    effect.play()
-    os.remove(path)
+    effect.setLoopCount(0)
     return effect
 
 
@@ -307,11 +305,4 @@ class Waveform:
 if __name__ == "__main__":
     sr = 44100
     t = np.arange(0, 5, 1.0 / sr)
-    y_smooth = random_smoothed(1, 5, 440, sr, 0, 50, 100)
-    y_smooth_low = random_smoothed(1, 5, 220, sr, 0, 11, 10)
-    y = y_smooth_low + y_smooth
-    echoed = echo(y, 63, .5, sr)
-    echoed_norm = echoed / np.max(np.abs(echoed))
-    sf.write("audio/tests/y_smooth.wav", y_smooth, sr)
-    sf.write("audio/tests/echoed.wav", echoed, sr)
 
