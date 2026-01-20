@@ -28,18 +28,6 @@ def aug_note(vol, duration, hz, sr):
     return raw + add1 + add2 + add3
 
 
-def fade_out(audio, seconds_from_end, sr):
-    """
-    
-    """
-    n = len(audio)
-    if seconds_from_end * sr >= n:
-        return audio
-    start_index = int(n - seconds_from_end * sr)
-    fade = np.concatenate((audio[:start_index], audio[start_index:] - audio[start_index:] * np.arange(0, 1, 1 / (n - start_index)).reshape(-1, 1)))
-    return fade
-
-
 def all_forms(vol, duration, hz, sr, shift=0):
     saw = .25 * sawtooth(vol, duration, hz, sr, shift=shift + np.random.random())
     tri = .25 * triangular(vol, duration, hz, sr, shift=shift + np.random.random())
@@ -142,6 +130,11 @@ def stereo_test(sample_rate):
     sample2 = aug_note(1, .5, 293.66 * 2 ** (3 / 12), sample_rate)
     return np.array([sample1, sample2]).T
 
+
+def generate_sequence(frequencies: list[list]) -> np.ndarray:
+    """
+    TODO
+    """
 
 def soul_hemorrhage(sample_rate, bpm):
     n = 100
@@ -646,7 +639,7 @@ def soul_hemorrhage(sample_rate, bpm):
     ]
     audio = np.concatenate(sequence)
     #audio = fade_out(audio, 1, sample_rate)
-    sf.write("audio/fast_hemorrhage.wav", audio, sample_rate)
+    #sf.write("audio/fast_hemorrhage.wav", audio, sample_rate)
 
 
 if __name__ == "__main__":
