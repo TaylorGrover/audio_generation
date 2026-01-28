@@ -1,5 +1,6 @@
 from PySide6.QtCore import QUrl
 from PySide6.QtMultimedia import QSoundEffect
+import copy
 import glob
 import matplotlib.pyplot as plt
 import numpy as np
@@ -124,7 +125,7 @@ def filtered_delay(
     return delayed
 
 
-def hard_filter(audio: np.ndarray, lower_freq, upper_freq, fraction, sr):
+def hard_filter(audio: np.ndarray, lower_freq, upper_freq, fraction, sr, normalize=True):
     """
     Use FFT to adjust specified frequency amplitudes
     """
@@ -137,8 +138,42 @@ def hard_filter(audio: np.ndarray, lower_freq, upper_freq, fraction, sr):
     frequencies[:n//2] *= freq_filter
     frequencies[n//2:] *= freq_filter[::-1]
     filtered = fft.ifft(frequencies, axis=0).real
-    filtered /= np.max(np.abs(filtered))
+    if normalize:
+        filtered /= np.max(np.abs(filtered))
     return filtered
+
+def phaser(
+    audio: np.ndarray,
+    bandwidth: float,
+    min_freq: float,
+    max_freq: float,
+    depth: float, 
+    cycle_seconds: float,
+    phase_window_seconds: int,
+    sr: int
+):
+    if cycle_seconds <= 0:
+        raise ValueError("Cycle duration must exceed 0")
+    if min_freq > max_freq:
+        min_freq, max_freq = max_freq, min_freq
+    bandwidth = np.abs(bandwidth)
+    if max_freq - min_freq < bandwidth:
+        raise ValueError("Bandwidth exceeds frequency range")
+    phased = copy.copy(audio)
+    cycle_hz = 1.0 / cycle_seconds
+    phase_window_samples = int(phase_window_seconds * sr)
+    for index_start in range(0, len(audio) - phase_window_samples, phase_window_samples):
+        low_freq = (max_freq - min_freq) * np.sin(2 * np.pi * cycle_hz * index_start / sr) + min_freq
+        audio_chunk = phased[index_start:index_start + phase_window_samples] 
+        phased[index_start:index_start + phase_window_samples] = hard_filter(
+            audio_chunk,
+            low_freq, 
+            low_freq + bandwidth,
+            depth,
+            sr,
+            normalize=False
+        )
+    return phased / np.max(np.abs(phased))
 
 
 def fade_out(audio, seconds_from_end, sr):
