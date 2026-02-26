@@ -176,6 +176,7 @@ def phaser(
     return phased / np.max(np.abs(phased))
 
 
+
 def fade_out(audio, seconds_from_end, sr):
     """
     
@@ -238,6 +239,14 @@ def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
         seeds.append(s)
         wave += w
     return t, seeds, wave / np.max(np.abs(wave))
+
+def generate_frequency_drift(freq_kernel: list[float], drift_max: float=.1, drifts: int=3):
+    drift = np.abs(drift_max)
+    drift_exponents = [drift / (drifts+1) * i / 12 for i in range(-drifts-1, drifts+2)]
+    frequencies = []
+    for freq in freq_kernel:
+        frequencies.extend(map(lambda e: freq * 2 ** e, drift_exponents))
+    return frequencies
 
 def echo(signal: np.ndarray, dist: float, decay, sr: int):
     # Dist in meters
