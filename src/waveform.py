@@ -210,7 +210,7 @@ def random(vol, duration, hz, sr, shift=0, n=50):
 def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
     assert duration > 0, "Duration must be greater than 0"
     wavelength = 1.0 / hz
-    t = np.arange(0, duration, 1.0 / sr)
+    t = np.linspace(0, duration, int(duration*sr))
     s = np.random.uniform(-1, 1, n)
     s = np.concatenate((s, [s[0]]))
     js = np.array([i for i in range(1, n + 1)])
@@ -225,11 +225,13 @@ def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
         coefficients[k - 1] = 2 / wavelength * np.sum(segments)
         wave += coefficients[k - 1] * np.sin(alpha_k * t)
     #plt.plot(t, np.interp(t, np.linspace(0, 1.0/wavelength, len(s) - 1), s[:-1], period=1/wavelength))
+    wave /= np.max(np.abs(wave))
+    wave = np.array([wave, wave]).T
     return t, s, wave 
 
 def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
     assert duration > 0, "Duration must be greater than 0"
-    wave = np.linspace(0, duration, int(sr * duration))
+    wave = np.zeros((int(sr * duration), 2))
     seeds = []
     for freq in freqs:
         t, s, w = random_smoothed(vol, duration, freq, sr, shift=shift, n=n, M=M)
