@@ -227,6 +227,15 @@ def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
     #plt.plot(t, np.interp(t, np.linspace(0, 1.0/wavelength, len(s) - 1), s[:-1], period=1/wavelength))
     return t, s, wave 
 
+def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
+    assert duration > 0, "Duration must be greater than 0"
+    wave = np.linspace(0, duration, int(sr * duration))
+    seeds = []
+    for freq in freqs:
+        t, s, w = random_smoothed(vol, duration, freq, sr, shift=shift, n=n, M=M)
+        seeds.append(s)
+        wave += w
+    return t, seeds, wave / np.max(np.abs(wave))
 
 def echo(signal: np.ndarray, dist: float, decay, sr: int):
     # Dist in meters
