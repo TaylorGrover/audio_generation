@@ -248,6 +248,7 @@ def generate_frequency_drift(freq_kernel: list[float], drift_max: float=.1, drif
         frequencies.extend(map(lambda e: freq * 2 ** e, drift_exponents))
     return frequencies
 
+
 def echo(signal: np.ndarray, dist: float, decay, sr: int):
     # Dist in meters
     if len(signal.shape) > 1 and signal.shape[1] > 2:
