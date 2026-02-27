@@ -292,6 +292,20 @@ def play(waveform, sr=44100):
     return effect
 
 
+
+def reverb(audio, sr):
+    """
+    First attempt at reverb. Referencing the doc at 
+    https://signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/
+    """
+    # Multi-channel feedback loop
+    channel_durations = [
+        .1, .05, .03, .22
+    ]
+    channels = [np.copy(audio) for _ in range(4)]
+    delayed_channels = [delay(audio, int(duration*sr), decay_base=1.9) for duration in channel_durations]
+
+
 class SoundPlayer:
     """
     A hacky solution to play sounds in PyQt5
