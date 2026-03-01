@@ -196,7 +196,7 @@ def sine_sweep(duration, low, high, sr):
 def eff_sweep(duration, low, high, sr):
     return play(sine_sweep(duration, low, high, sr), sr=sr)
 
-def random(vol, duration, hz, sr, shift=0, n=50):
+def random_linear(vol, duration, hz, sr, shift=0, n=50):
     assert duration > 0, "Duration must be greater than 0"
     t = np.arange(0, duration, 1.0 / sr)
     s = np.random.uniform(-1, 1, n)
@@ -205,8 +205,18 @@ def random(vol, duration, hz, sr, shift=0, n=50):
     t_norm = t - wavelength * np.floor(t / wavelength)
     j = np.ceil(t_norm * n / wavelength).astype(int)
     y = n / wavelength * (s[j] - s[j - 1]) * (t_norm - (j - 1) * wavelength / n) + s[j - 1]
-    return vol * y / np.max(np.abs(y))
+    y_norm = y / np.max(np.abs(y))
+    return s, vol * np.array([y_norm, y_norm]).T
 
+def combined_random_linear(vol, duration, freqs, sr, shift=0, n=17):
+    assert duration > 0, "Duration must be greater than 0"
+    seeds = []
+    wave = np.zeros((int(sr * duration), 2))
+    for freq in freqs:
+        s, w = random_linear(vol, duration, freq, sr, shift, n)
+        seeds.append(s)
+        wave += w
+    return seeds, wave / np.max(np.abs(wave), axis=0)
 
 def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
     assert duration > 0, "Duration must be greater than 0"
@@ -249,6 +259,13 @@ def generate_frequency_drift(freq_kernel: list[float], drift_max: float=.1, drif
     return frequencies
 
 
+def all_pass(
+    audio: np.ndarray
+    , delay_seconds
+):
+    pass
+
+
 def echo(signal: np.ndarray, dist: float, decay, sr: int):
     # Dist in meters
     if len(signal.shape) > 1 and signal.shape[1] > 2:
@@ -279,7 +296,7 @@ FORM_TO_STR_MAP = {
 
 STRING_TO_FORM_MAP = dict((FORM_TO_STR_MAP[form], form) for form in FORM_TO_STR_MAP)
 
-def play(waveform, sr=44100):
+def play(waveform, loop=False, sr=44100):
     chars = [char for char in string.ascii_letters]
     name = "".join(np.random.choice(chars, 8, replace=True)) + ".wav"
     path = os.path.join(AUDIO_DIR, "tmp", name)
@@ -288,23 +305,43 @@ def play(waveform, sr=44100):
     effect = QSoundEffect()
     effect.setSource(url)
     print(QSoundEffect.Loop.Infinite.value)
-    effect.setLoopCount(0)
+    if loop:
+        effect.setLoopCount(QSoundEffect.Loop.Infinite.value)
+    else:
+        effect.setLoopCount(0)
     return effect
 
 
 
-def reverb(audio, sr):
+def reverb(audio, channel_count, channel_bandwidth, sr):
     """
     First attempt at reverb. Referencing the doc at 
     https://signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/
     """
     # Multi-channel feedback loop
-    channel_durations = [
-        .1, .05, .03, .22
-    ]
-    channels = [np.copy(audio) for _ in range(4)]
-    delayed_channels = [delay(audio, int(duration*sr), decay_base=1.9) for duration in channel_durations]
+    channel_durations = np.random.uniform(*channel_bandwidth, channel_count)
+    delayed_channels = [delay(audio, int(duration*sr), decay_base=1.8) for duration in channel_durations]
+    max_len = max([len(channel) for channel in delayed_channels])
+    delayed_channels = np.array(list(map(lambda l: np.concatenate((l, np.zeros((max_len - len(l), 2)))), delayed_channels)))
+    left_channels = delayed_channels.T[0].T
+    right_channels = delayed_channels.T[1].T
+    left_diffuse = diffuse(left_channels, channel_count)
+    right_diffuse = diffuse(right_channels, channel_count)
+    return np.array([left_diffuse, right_diffuse]).T
 
+def diffuse(audio, channel_count):
+    H = np.random.random((channel_count, channel_count))
+    H /= H.sum(axis=1).reshape(-1, 1)
+    shuffled = shuffle_polarity(audio, channel_count)
+    combination = np.sum(H.dot(shuffled), axis=0)
+    return combination
+
+def shuffle_polarity(audio: np.ndarray, channel_count) -> np.ndarray:
+    indices = [i for i in range(len(audio))]
+    np.random.shuffle(indices)
+    polarities = np.random.choice([-1, 1], replace=True, size=channel_count)
+    shuffled = audio[indices] * polarities.reshape(-1, 1)
+    return shuffled
 
 class SoundPlayer:
     """

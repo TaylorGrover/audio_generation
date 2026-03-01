@@ -46,3 +46,23 @@ $$
 $$
 =\frac{2}{\lambda}\sum_{j=1}^n\left[-\frac{1}{\alpha_k}\left(\frac{m_j\lambda}{n}+s_j\right)\cos(\alpha_kb_j)+\frac{s_j}{\alpha_k}\cos(\alpha_ka_j)+\frac{m_j}{\alpha_k^2}\sin(\alpha_kb_j)-\frac{m_j}{\alpha_k^2}\sin(\alpha_ka_j)\right]
 $$
+
+##
+
+## Sequencer Components
+
+* Note locations
+* Note volumes
+* Note instruments
+* Note durations
+* Grid snap
+
+## Signal Chain
+Just a sequence of functions that transform an input signal into a final processed
+output.
+
+## Instrument Suite
+
+## Effects Suite
+
+## Mixer
