@@ -313,34 +313,57 @@ def play(waveform, loop=False, sr=44100):
 
 
 
-def reverb(audio, channel_count, channel_bandwidth, sr):
+def reverb(audio, channel_count, sample_delay_range, diffusion_iterations, sr):
     """
     First attempt at reverb. Referencing the doc at 
     https://signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/
     """
+    diffused_channels = np.copy(audio)
+    diffusion_results = []
+    sample_delay_segments = [[sample_delay_range / channel_count * (i + 1), sample_delay_range / channel_count * (i + 2)] for i in range(channel_count)]
+    for i in range(diffusion_iterations):
+        diffused_channels = _multi_channel_feedback_loop(diffused_channels, channel_count, sample_delay_segments[0], sr)
+        diffusion_results.append(diffused_channels)
+    h_vector = np.random.uniform(-1, 1, (channel_count, 1))
+    householder = np.identity(channel_count) - 2 * h_vector.dot(h_vector.T) / h_vector.T.dot(h_vector)
+    diffused_channels
+    diffusion_results = list(map(lambda l: np.concatenate((l, np.zeros((len(diffused_channels) - len(l), 2))))))
+
+    return diffused_channels
+
+def _multi_channel_feedback_loop(audio, channel_count, sample_delay_range, sr):
     # Multi-channel feedback loop
-    channel_durations = np.random.uniform(*channel_bandwidth, channel_count)
+    channel_durations = np.random.uniform(*sample_delay_range, channel_count)
     delayed_channels = [delay(audio, int(duration*sr), decay_base=1.8) for duration in channel_durations]
     max_len = max([len(channel) for channel in delayed_channels])
     delayed_channels = np.array(list(map(lambda l: np.concatenate((l, np.zeros((max_len - len(l), 2)))), delayed_channels)))
-    left_channels = delayed_channels.T[0].T
-    right_channels = delayed_channels.T[1].T
-    left_diffuse = diffuse(left_channels, channel_count)
-    right_diffuse = diffuse(right_channels, channel_count)
-    return np.array([left_diffuse, right_diffuse]).T
+    diffused_channels = diffuse(delayed_channels)
+    return diffused_channels
 
-def diffuse(audio, channel_count):
+
+def diffuse(channels: np.ndarray):
+    # The channel shape is expected to be a 3-tuple:
+    # (channel_count, samples, 2)
+    channel_count = len(channels)
     H = np.random.random((channel_count, channel_count))
-    H /= H.sum(axis=1).reshape(-1, 1)
-    shuffled = shuffle_polarity(audio, channel_count)
-    combination = np.sum(H.dot(shuffled), axis=0)
-    return combination
+    H /= H.sum(axis=1).reshape(-1, 1) # Normalize rows
+    shuffled = shuffle_polarity(channels)
+    left_shuffled = shuffled.T[0].T
+    right_shuffled = shuffled.T[1].T
+    left_combination = np.sum(H.dot(left_shuffled.T), axis=0)
+    right_combination = np.sum(H.dot(right_shuffled.T), axis=0)
+    return np.array([left_combination, right_combination]).T
 
-def shuffle_polarity(audio: np.ndarray, channel_count) -> np.ndarray:
-    indices = [i for i in range(len(audio))]
+def shuffle_polarity(channels: np.ndarray) -> np.ndarray:
+    channel_count = len(channels)
+    left_channels = channels.T[0].T
+    right_channels = channels.T[1].T
+    indices = [i for i in range(channel_count)]
     np.random.shuffle(indices)
-    polarities = np.random.choice([-1, 1], replace=True, size=channel_count)
-    shuffled = audio[indices] * polarities.reshape(-1, 1)
+    polarities = np.random.choice([-1, 1], replace=True, size=channel_count).reshape(-1, 1)
+    left_shuffled = left_channels[indices] * polarities
+    right_shuffled = right_channels[indices] * polarities
+    shuffled = np.array([left_shuffled, right_shuffled]).T
     return shuffled
 
 class SoundPlayer:
