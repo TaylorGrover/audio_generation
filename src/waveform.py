@@ -327,83 +327,53 @@ def play(waveform, loop=False, sr=44100):
         effect.setLoopCount(0)
     return effect
 
+def segment_partition(low, high, parts: int):
+    if low > high:
+        low, high = high, low
+    diff = high - low
+    frac = diff / parts
+    return [[low + frac*i , low+frac*(i+1)] for i in range(parts+1)]
 
-
-def reverb(audio, channel_count, sample_delay_range: list, diffusion_iterations, sr):
+def reverb(audio, channel_count, channel_bandwidth: list[2], diffusion_steps, sr):
     """
     First attempt at reverb. Referencing the doc at 
     https://signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/
     """
-    diffused_channels = np.array([np.copy(audio) for _ in range(channel_count)])
-    diffusion_results = []
-    start_delay_ms = sample_delay_range[0]
-    range_ms = sample_delay_range[1] - sample_delay_range[0]
-    sample_delay_segments = [[start_delay_ms + range_ms / channel_count * i, start_delay_ms + range_ms / channel_count * (i + 1)] for i in range(channel_count)]
-    for i in range(diffusion_iterations):
-        diffused_channels = _multi_channel_feedback_loop(diffused_channels, channel_count, sample_delay_segments[i], sr)
-        diffusion_results.append(diffused_channels)
-        total_diffused = np.sum(diffused_channels, axis=0)
-        diffused_channels = np.array([np.copy(total_diffused) for _ in range(channel_count)])
-        print("Diffusion iteration: %d" % i)
-    h_vector = np.random.uniform(-1, 1, (channel_count, 1))
-    householder = np.identity(channel_count) - 2 * h_vector.dot(h_vector.T) / h_vector.T.dot(h_vector)
-    delayed_diffused = list(map(lambda l: delay(l, int(sr*(start_delay_ms+np.random.uniform(0, .1*range_ms)))), diffused_channels))
-    delayed_diffused = make_uniform_channels(delayed_diffused)
-    print(delayed_diffused.shape)
-    #diffusion_results = list(map(lambda l: np.concatenate((l, np.zeros((len(delayed_diffused[0]) - len(l), 2)))), diffusion_results))
-    left = delayed_diffused.T[0].T
-    right = delayed_diffused.T[1].T
-    left_feedback = householder.dot(left)
-    right_feedback = householder.dot(right)
-    combined_feedback = np.array([left.T, right.T]).T
-    mixed = np.sum(combined_feedback, axis=0)
-    #prior_stages = np.sum(diffusion_results, axis=0)
-    return mixed / np.max(np.abs(mixed), axis=0)
-
-def _multi_channel_feedback_loop(channels, channel_count, sample_delay_range, sr, shuffle_indices=[0, 1, 2, 3, 4, 5, 6, 7]):
     # Multi-channel feedback loop
-    #channel_durations = np.random.uniform(*sample_delay_range, channel_count)
-    start_duration = sample_delay_range[0]
-    duration_range = sample_delay_range[1] - sample_delay_range[0]
-    channel_durations = [start_duration + duration_range * i / channel_count for i in range(channel_count)]
-    print(channel_durations)
-    delayed_channels = [delay(channels[i], int(duration*sr), num_delays=8, decay_fraction=.4, decay_base=1.2) for i, duration in enumerate(channel_durations)]
-    max_len = max([len(channel) for channel in delayed_channels])
-    delayed_channels = np.array(list(map(lambda l: np.concatenate((l, np.zeros((max_len - len(l), 2)))), delayed_channels)))
-    diffused_channels = diffuse(delayed_channels, shuffle_indices)
-    return diffused_channels
 
+    sub_bandwidths = segment_partition(*channel_bandwidth, diffusion_steps)
+    combination = np.copy(audio)
+    for i in range(diffusion_steps):
+        channel_durations = np.random.uniform(*sub_bandwidths[i], channel_count)
+        delayed_channels = [delay(combination, int(duration*sr), decay_base=1.8) for duration in channel_durations]
+        max_len = max([len(channel) for channel in delayed_channels])
+        delayed_channels = np.array(list(map(lambda l: np.concatenate((l, np.zeros((max_len - len(l), 2)))), delayed_channels)))
+        combination = diffuse(delayed_channels, channel_count)
+    combination /= np.max(np.abs(combination), axis=0)
+    return combination
 
-def diffuse(channels: np.ndarray, indices=[0, 1, 2, 3, 4, 5, 6, 7]):
-    # The channel shape is expected to be a 3-tuple:
-    # (channel_count, samples, 2)
-    channel_count = len(channels)
-    assert channel_count >= 2
-    #H = 1/8 * hadamard_matrix(channel_count)
+def diffuse(audio, channel_count):
+    """
+    """
     H = np.random.random((channel_count, channel_count))
-    H /= H.sum(axis=1).reshape(channel_count, 1)
-    shuffled = shuffle_polarity(channels, indices)
+    H /= H.sum(axis=1).reshape(-1, 1)
+    shuffled = shuffle_polarity(audio, channel_count)
     left_shuffled = shuffled.T[0].T
     right_shuffled = shuffled.T[1].T
-    left_hadamard = H.dot(left_shuffled)
-    right_hadamard = H.dot(right_shuffled)
-    return np.array([left_hadamard.T, right_hadamard.T]).T
+    left_combination = np.sum(H.dot(left_shuffled), axis=0)
+    right_combination = np.sum(H.dot(right_shuffled), axis=0)
+    combination = np.array([left_combination, right_combination]).T
+    return combination
 
-def shuffle_polarity(channels: np.ndarray, indices=[0, 1, 2, 3, 4, 5, 6, 7]) -> np.ndarray:
-    """
-    Indices need to specified ahead of time if channel count is not 8.
-    """
-    channel_count = len(channels)
-    left_channels = channels.T[0].T
-    right_channels = channels.T[1].T
-    indices = [i for i in range(channel_count)]
+def shuffle_polarity(audio: np.ndarray, channel_count) -> np.ndarray:
+    left_channels = audio.T[0].T
+    right_channels = audio.T[1].T
+    indices = [i for i in range(len(audio))]
     np.random.shuffle(indices)
-    print(indices)
-    polarities = np.random.choice(np.concatenate(([-1 for i in range(channel_count // 2)], [1 for i in range(channel_count // 2)])), replace=False, size=channel_count).reshape(-1, 1)
-    left_shuffled = left_channels[indices] * polarities
-    right_shuffled = right_channels[indices] * polarities
-    shuffled = np.array([left_shuffled.T, right_shuffled.T]).T
-    return shuffled
+    polarities = np.random.choice([-1, 1], replace=True, size=channel_count)
+    left_shuffled = left_channels[indices] * polarities.reshape(-1, 1)
+    right_shuffled = right_channels[indices] * polarities.reshape(-1, 1)
+    return np.array([left_shuffled.T, right_shuffled.T]).T
 
 def hadamard_matrix(dim: int) -> np.ndarray:
     """
