@@ -218,7 +218,23 @@ def combined_random_linear(vol, duration, freqs, sr, shift=0, n=17):
         wave += w
     return seeds, wave / np.max(np.abs(wave), axis=0)
 
-def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=100):
+def sine_coefficients_of_points(points_seed: np.ndarray, hz: float, sine_count=17):
+    n = len(points_seed)
+    wavelength = 1.0 / hz
+    js = np.array([i for i in range(1, n + 1)])
+    lowers = (js - 1) * wavelength / n
+    uppers = js * wavelength / n
+    s = np.concatenate((points_seed, [points_seed[0]]))
+    ms = n / wavelength * (s[1:] - s[:-1])
+    coefficients = np.zeros(sine_count)
+    for k in range(1, sine_count + 1):
+        alpha_k = 2 * np.pi * k / wavelength
+        segments = -1 / alpha_k * (ms * wavelength / n + s[:-1]) * np.cos(alpha_k * uppers) + s[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
+    return coefficients
+
+
+def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
     assert duration > 0, "Duration must be greater than 0"
     wavelength = 1.0 / hz
     t = np.linspace(0, duration, int(duration*sr))
@@ -318,7 +334,7 @@ def reverb(audio, channel_count, sample_delay_range: list, diffusion_iterations,
     First attempt at reverb. Referencing the doc at 
     https://signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/
     """
-    diffused_channels = np.array([np.copy(audio) for i in range(channel_count)])
+    diffused_channels = np.array([np.copy(audio) for _ in range(channel_count)])
     diffusion_results = []
     start_delay_ms = sample_delay_range[0]
     range_ms = sample_delay_range[1] - sample_delay_range[0]
@@ -326,6 +342,8 @@ def reverb(audio, channel_count, sample_delay_range: list, diffusion_iterations,
     for i in range(diffusion_iterations):
         diffused_channels = _multi_channel_feedback_loop(diffused_channels, channel_count, sample_delay_segments[i], sr)
         diffusion_results.append(diffused_channels)
+        total_diffused = np.sum(diffused_channels, axis=0)
+        diffused_channels = np.array([np.copy(total_diffused) for _ in range(channel_count)])
         print("Diffusion iteration: %d" % i)
     h_vector = np.random.uniform(-1, 1, (channel_count, 1))
     householder = np.identity(channel_count) - 2 * h_vector.dot(h_vector.T) / h_vector.T.dot(h_vector)
@@ -341,7 +359,6 @@ def reverb(audio, channel_count, sample_delay_range: list, diffusion_iterations,
     mixed = np.sum(combined_feedback, axis=0)
     #prior_stages = np.sum(diffusion_results, axis=0)
     return mixed / np.max(np.abs(mixed), axis=0)
-
 
 def _multi_channel_feedback_loop(channels, channel_count, sample_delay_range, sr, shuffle_indices=[0, 1, 2, 3, 4, 5, 6, 7]):
     # Multi-channel feedback loop
@@ -362,7 +379,9 @@ def diffuse(channels: np.ndarray, indices=[0, 1, 2, 3, 4, 5, 6, 7]):
     # (channel_count, samples, 2)
     channel_count = len(channels)
     assert channel_count >= 2
-    H = 1/8 * hadamard_matrix(channel_count)
+    #H = 1/8 * hadamard_matrix(channel_count)
+    H = np.random.random((channel_count, channel_count))
+    H /= H.sum(axis=1).reshape(channel_count, 1)
     shuffled = shuffle_polarity(channels, indices)
     left_shuffled = shuffled.T[0].T
     right_shuffled = shuffled.T[1].T
