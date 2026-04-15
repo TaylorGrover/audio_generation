@@ -236,6 +236,7 @@ class WaveformWindow(QWidget):
 class WaveformConfigWindow(QWidget):
     """
     paramsChanged signal emitted to parent window (WaveformWindow)
+    TODO: Add spin box for time-depedent frequency functions
     """
     paramsChanged = QtCore.Signal()
 
