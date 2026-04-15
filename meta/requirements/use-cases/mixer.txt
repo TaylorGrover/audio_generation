@@ -1,0 +1,5 @@
+A mixer should have multiple channels. Instruments can be routed to each
+channel mixer. There should also be a master mix.
+
+Use case: Feed several instruments into a mixing channel; apply fx chain to
+the channel, affecting all instruments routed to the channel.

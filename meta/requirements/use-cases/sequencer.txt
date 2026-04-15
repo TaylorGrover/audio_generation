@@ -1,0 +1,9 @@
+Sequence instrument signals with pitch and duration over a timeline.
+
+* The sequencer interface should have a dropdown for selected instruments
+* The ability to set snap-grid intervals (e.g., triplets, quarter, eighth,
+  sixteenth, thirty-second, 1/9th)
+* Pitch selection for each item. Pitch and time axes can flip. Pitch can
+  increase from south to north while time travels left to right, or vice
+  versa.
+

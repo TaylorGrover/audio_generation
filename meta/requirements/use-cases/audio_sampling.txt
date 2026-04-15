@@ -1,0 +1,8 @@
+The system should be able to sample audio for indefinite durations. The
+front-end interface should visualize the amplitudes over time efficiently.
+I.e., there should not be any reduction in performance after recording for
+exceedingly long time periods. 
+
+* Samples can be recorded as standalone objects, or they can be recorded
+  directly into the sequencer as audio objects.
+* Recordings can be applied as midi instruments 

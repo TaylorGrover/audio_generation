@@ -256,6 +256,35 @@ def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
     wave = np.array([wave, wave]).T
     return t, s, wave 
 
+def random_smoothed_with_bend(vol, duration, hz, sr, shift=0, n=13, M=17, max_bend=.3, max_osc=10):
+    t = np.linspace(0, duration, int(duration * sr))
+    wavelength = 1.0 / hz
+    seed = np.random.uniform(-1, 1, n)
+    coefficients = sine_coefficients_of_points(seed, hz, sine_count=M)
+    wave = np.zeros_like(t)
+    bend_depths = np.random.uniform(0, max_bend, M)
+    bend_osc = np.random.uniform(0, max_osc, M)
+    for k in range(1, M + 1):
+        wave += coefficients[k - 1] * sine_bend_centered(duration, k / wavelength, bend_depths[k-1], bend_osc[k-1], sr)
+    wave /= np.max(np.abs(wave))
+    wave = np.array([wave, wave]).T
+    return t, seed, wave
+
+def sine_bend_centered(duration, freq, bend_dist, osc_freq, sr):
+    """
+    @param duration length of sample in seconds
+    @param freq is just the ordinary frequency of the sine wave (in hz)
+    @param bend_dist maximum pitch bend in half steps
+    @param osc_freq the maximum message ordinary frequency (pitch bend frequency)
+    @param sr the sample rate
+    """
+    t = np.linspace(0, duration, int(duration * sr))
+    freq_carrier = 2 * np.pi * freq
+    freq_message = 2 * np.pi * osc_freq
+    p = 2 * np.pi * freq * (2 ** (bend_dist / 12) - 1)
+    theta = lambda tau: freq_carrier * tau - p / freq_message * np.cos(freq_message * tau)
+    return np.sin(theta(t))
+
 def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
     assert duration > 0, "Duration must be greater than 0"
     wave = np.zeros((int(sr * duration), 2))
@@ -265,6 +294,32 @@ def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
         seeds.append(s)
         wave += w
     return t, seeds, wave / np.max(np.abs(wave))
+
+def combine_bendy(vol, duration, freqs, sr, shift=0, n=13, M=17, max_bend=.3, max_osc=5):
+    wave = np.zeros((int(sr * duration), 2))
+    seeds = []
+    for freq in freqs:
+        t, s, w = random_smoothed_with_bend(vol, duration, freq, sr, shift=shift, n=n, M=M, max_bend=max_bend, max_osc=max_osc)
+        seeds.append(s)
+        wave += w
+    return t, seeds, wave / np.max(np.abs(wave))
+
+def combine_random_smoothed_lr(vol, duration, freqs, sr, shift=0, n=17, M=15):
+    """
+    This one makes semi-ethereal organ sounds, depending on the drift width chosen
+    """
+    left = np.zeros((int(sr * duration)))
+    right = np.zeros((int(sr * duration)))
+    seeds = []
+    for freq in freqs:
+        t, s_l, w_l = random_smoothed(vol, duration, freq, sr, shift=shift, n=n, M=M)
+        t, s_r, w_r = random_smoothed(vol, duration, freq, sr, shift=shift, n=n, M=M)
+        seeds.extend([s_l, s_r])
+        left += w_l[:, 0]
+        right += w_r[:, 0]
+    left /= np.max(np.abs(left))
+    right /= np.max(np.abs(right))
+    return t, seeds, np.array([left, right]).T
 
 def generate_frequency_drift(freq_kernel: list[float], drift_max: float=.1, drifts: int=3):
     drift = np.abs(drift_max)
@@ -334,6 +389,14 @@ def segment_partition(low, high, parts: int):
     frac = diff / parts
     return [[low + frac*i , low+frac*(i+1)] for i in range(parts+1)]
 
+def dry_wet_reverb(audio, channel_count, channel_bandwidth, diffusion_steps, wet, sr):
+    if wet < 0 or wet > 1:
+        raise ValueError("Wet factor should be between 0 and 1, inclusive.")
+    reverbed = reverb(audio, channel_count, channel_bandwidth, diffusion_steps, sr)
+    combined = np.concatenate((audio, np.zeros((len(reverbed) - len(audio), 2)))) * (1 - wet) + reverbed * wet
+    combined /= np.max(np.abs(combined), axis=0)
+    return combined
+
 def reverb(audio, channel_count, channel_bandwidth: list[2], diffusion_steps, sr):
     """
     First attempt at reverb. Referencing the doc at 
@@ -345,7 +408,7 @@ def reverb(audio, channel_count, channel_bandwidth: list[2], diffusion_steps, sr
     combination = np.copy(audio)
     for i in range(diffusion_steps):
         channel_durations = np.random.uniform(*sub_bandwidths[i], channel_count)
-        delayed_channels = [delay(combination, int(duration*sr), decay_base=1.8) for duration in channel_durations]
+        delayed_channels = [delay(combination, int(duration*sr), decay_base=1.5) for duration in channel_durations]
         max_len = max([len(channel) for channel in delayed_channels])
         delayed_channels = np.array(list(map(lambda l: np.concatenate((l, np.zeros((max_len - len(l), 2)))), delayed_channels)))
         combination = diffuse(delayed_channels, channel_count)
@@ -357,6 +420,7 @@ def diffuse(audio, channel_count):
     """
     H = np.random.random((channel_count, channel_count))
     H /= H.sum(axis=1).reshape(-1, 1)
+    #H = hadamard_matrix(channel_count)
     shuffled = shuffle_polarity(audio, channel_count)
     left_shuffled = shuffled.T[0].T
     right_shuffled = shuffled.T[1].T
@@ -548,7 +612,7 @@ if __name__ == "__main__":
     #berg = bergunde
     #berg = np.array([berg, berg]).T
     orig = play(berg)
-    reverbed = reverb(berg, 8, [.024, .192], 5, sr)
+    reverbed = reverb(bergunde, 8, [.004, .07], 4, sr)
     effect = play(reverbed)
     effect.play()
 
