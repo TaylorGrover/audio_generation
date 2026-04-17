@@ -2,3 +2,10 @@
 audio/tmp/*
 audio/tests
 __pycache__
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+Sampler_autogen
+Sampler
