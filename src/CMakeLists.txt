@@ -9,6 +9,7 @@ find_library(LIBRT rt)
 
 target_link_libraries(Sampler PRIVATE ${CMAKE_DL_LIBS} Qt5::Widgets ${LIBRT} )
 
+set_target_properties(Sampler PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../)
 # Automoc for Qt applications
 set_property(TARGET Sampler PROPERTY AUTOMOC ON)
 

@@ -321,7 +321,6 @@ class GraphWidget(QWidget):
         self.graph.clear()
 
 
-
 def start_gui():
     app = QApplication(sys.argv)
     mainWin = MainWindow()
