@@ -216,6 +216,30 @@ Sampler_autogen/mocs_compilation.cpp.s:
 	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/Sampler_autogen/mocs_compilation.cpp.s
 .PHONY : Sampler_autogen/mocs_compilation.cpp.s
 
+__/deps/dial.o: __/deps/dial.cpp.o
+.PHONY : __/deps/dial.o
+
+# target to build an object file
+__/deps/dial.cpp.o:
+	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/dial.cpp.o
+.PHONY : __/deps/dial.cpp.o
+
+__/deps/dial.i: __/deps/dial.cpp.i
+.PHONY : __/deps/dial.i
+
+# target to preprocess a source file
+__/deps/dial.cpp.i:
+	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/dial.cpp.i
+.PHONY : __/deps/dial.cpp.i
+
+__/deps/dial.s: __/deps/dial.cpp.s
+.PHONY : __/deps/dial.s
+
+# target to generate assembly for a file
+__/deps/dial.cpp.s:
+	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/dial.cpp.s
+.PHONY : __/deps/dial.cpp.s
+
 __/deps/sampler_window.o: __/deps/sampler_window.cpp.o
 .PHONY : __/deps/sampler_window.o
 
@@ -258,6 +282,9 @@ help:
 	@echo "... Sampler_autogen/mocs_compilation.o"
 	@echo "... Sampler_autogen/mocs_compilation.i"
 	@echo "... Sampler_autogen/mocs_compilation.s"
+	@echo "... __/deps/dial.o"
+	@echo "... __/deps/dial.i"
+	@echo "... __/deps/dial.s"
 	@echo "... __/deps/sampler_window.o"
 	@echo "... __/deps/sampler_window.i"
 	@echo "... __/deps/sampler_window.s"

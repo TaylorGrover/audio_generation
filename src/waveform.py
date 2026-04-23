@@ -188,6 +188,15 @@ def fade_out(audio, seconds_from_end, sr):
     fade = np.concatenate((audio[:start_index], audio[start_index:] - audio[start_index:] * np.arange(0, 1, 1 / (n - start_index)).reshape(-1, 1)))
     return fade
 
+def fade_in(audio, seconds_from_start, sr):
+    n = len(audio)
+    if seconds_from_start * sr >= n:
+        return audio
+    start_index = int(seconds_from_start * sr)
+    faded_portion = audio[:start_index] * np.linspace(0, 1, start_index).reshape(-1, 1)
+    fade = np.concatenate((faded_portion, audio[start_index:]))
+    return fade
+
 
 def sine_sweep(duration, low, high, sr):
     t_ir = np.linspace(0, duration, int(duration * sr))

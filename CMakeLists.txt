@@ -81,4 +81,7 @@ endif()
 set(SAMPLER_WINDOW "${Sampler_SOURCE_DIR}/deps/sampler_window.h"
                    "${Sampler_SOURCE_DIR}/deps/sampler_window.cpp")
 
+set(DIAL "${Sampler_SOURCE_DIR}/deps/dial.h"
+         "${Sampler_SOURCE_DIR}/deps/dial.cpp")
+
 add_subdirectory(src)
