@@ -279,6 +279,18 @@ def random_smoothed_with_bend(vol, duration, hz, sr, shift=0, n=13, M=17, max_be
     wave = np.array([wave, wave]).T
     return t, seed, wave
 
+def random_smoothed_with_flutter(vol, duration, hz, sr, shift=0, n=13, M=17, max_flutter_freq=10):
+    t = np.linspace(0, duration, int(duration * sr))
+    wavelength = 1.0 / hz
+    seed = np.random.uniform(-1, 1, n)
+    coefficients = sine_coefficients_of_points(seed, hz, sine_count=M)
+    wave = np.zeros_like(t)
+    flutter_freqs = np.random.uniform(0, max_flutter_freq, M)
+    for k in range(1, M + 1):
+        wave += np.sin(2 * np.pi * flutter_freqs[k - 1] * t) * coefficients[k - 1] * np.sin(2 * np.pi * k / wavelength * t)
+    wave /= np.max(np.abs(wave), axis=0)
+    return t, seed, wave
+
 def sine_bend_centered(duration, freq, bend_dist, osc_freq, sr):
     """
     @param duration length of sample in seconds
@@ -330,9 +342,23 @@ def combine_random_smoothed_lr(vol, duration, freqs, sr, shift=0, n=17, M=15):
     right /= np.max(np.abs(right))
     return t, seeds, np.array([left, right]).T
 
+def combine_flutter(vol, duration, freqs, sr, shift=0, n=17, M=15, max_flutter_freq=10):
+    left = np.zeros((int(sr * duration)))
+    right = np.zeros_like(left)
+    seeds = []
+    for freq in freqs:
+        t, s_l, w_l = random_smoothed_with_flutter(vol, duration, freq, sr, shift=shift, n=n, M=M, max_flutter_freq=max_flutter_freq)
+        t, s_r, w_r = random_smoothed_with_flutter(vol, duration, freq, sr, shift=shift, n=n, M=M, max_flutter_freq=max_flutter_freq)
+        seeds.extend([s_l, s_r])
+        left += w_l
+        right += w_r
+    left /= np.max(np.abs(left))
+    right /= np.max(np.abs(right))
+    return t, seeds, np.array([left, right]).T
+
 def generate_frequency_drift(freq_kernel: list[float], drift_max: float=.1, drifts: int=3):
     drift = np.abs(drift_max)
-    drift_exponents = [drift / (drifts+1) * i / 12 for i in range(-drifts-1, drifts+2)]
+    drift_exponents = [drift / (drifts+1) * i / 12 for i in range(-drifts, drifts+1)]
     frequencies = []
     for freq in freq_kernel:
         frequencies.extend(map(lambda e: freq * 2 ** e, drift_exponents))
