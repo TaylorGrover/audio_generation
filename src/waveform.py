@@ -2,6 +2,8 @@ from PySide6.QtCore import QUrl
 from PySide6.QtMultimedia import QSoundEffect
 import copy
 import glob
+import itertools
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -82,9 +84,46 @@ def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
         coefficients[k - 1] = 2 / wavelength * np.sum(segments)
         wave += coefficients[k - 1] * np.sin(alpha_k * t)
     wave = vol * wave / np.max(np.abs(wave))
+    return vol * np.array([wave, wave]).T
+
+def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granularity="hundredths"):
+    if drift_granularity.lower() not in ["tenths", "hundredths"]:
+        raise ValueError("Granularity must either be tenths or hundredths")
+    if type(drifts_tenths) is not int:
+        raise ValueError("Drift tenths must be an integer")
+    if drift_granularity == "tenths":
+        drift_factor = 10
+    elif drift_granularity == "hundredths":
+        drift_factor = 1
+    drifts_tenths = np.abs(drifts_tenths)
+    n_samples = int(sr * duration)
+    t_indices = np.linspace(0, n_samples, n_samples, dtype=int)
+    left = np.zeros_like(t_indices)
+    right = np.zeros_like(t_indices)
+    wave_index_offsets = np.array([i for i in range(-drifts_tenths*drift_factor, drifts_tenths*drift_factor+1, drift_factor)])
+    for note in notes:
+        wave_base_index = note_map[note]
+        for i, wave_index_offset in enumerate(wave_index_offsets):
+            wave_current_index = wave_base_index + wave_index_offset
+            wave_samples = wavelength_samples[wave_current_index]
+            indices_modulo = t_indices % wave_samples
+            if i % 2 == 0:
+                left = left + waves[wave_current_index][indices_modulo]
+            else:
+                right = right + waves[wave_current_index][indices_modulo]
+    wave = np.array([left, right]).T
+    wave /= np.max(np.abs(wave), axis=0)
     return vol * wave
 
-
+def threshold_filter(audio, threshold_amplitude_percentage=.1):
+    freq = np.fft.fft(audio, axis=0)
+    amps = np.abs(freq)
+    amps /= np.max(amps, axis=0)
+    where_rows, where_cols = np.where(amps < threshold_amplitude_percentage * .01)
+    freq[where_rows, where_cols] *= 0
+    back = np.fft.ifft(freq, axis=0).real
+    back /= np.max(np.abs(back), axis=0)
+    return back
 
 def delay(audio, samples_ahead, num_delays=4, decay_fraction=.8, decay_base=2, sr=44100):
     """
@@ -265,6 +304,11 @@ def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
     wave = np.array([wave, wave]).T
     return t, s, wave 
 
+def random_smoothed_with_time(vol, tim, hz, sr, shift=0, n=5, M=17):
+    assert len(tim) > 0, "Duration must be greater than zero"
+    wavelength = 1.0 / hz
+    seed = np.random.uniform(-1, 1, n)
+
 def random_smoothed_with_bend(vol, duration, hz, sr, shift=0, n=13, M=17, max_bend=.3, max_osc=10):
     t = np.linspace(0, duration, int(duration * sr))
     wavelength = 1.0 / hz
@@ -274,10 +318,23 @@ def random_smoothed_with_bend(vol, duration, hz, sr, shift=0, n=13, M=17, max_be
     bend_depths = np.random.uniform(0, max_bend, M)
     bend_osc = np.random.uniform(0, max_osc, M)
     for k in range(1, M + 1):
-        wave += coefficients[k - 1] * sine_bend_centered(duration, k / wavelength, bend_depths[k-1], bend_osc[k-1], sr)
+        wave += coefficients[k - 1] * sine_bend_centered_with_time(t, k / wavelength, bend_depths[k-1], bend_osc[k-1], sr)
     wave /= np.max(np.abs(wave))
     wave = np.array([wave, wave]).T
     return t, seed, wave
+
+def random_smoothed_with_bend_with_time(vol, tim, hz, sr, shift=0, n=13, M=17, max_bend=.3, max_osc=10):
+    wavelength = 1.0 / hz
+    seed = np.random.uniform(-1, 1, n)
+    coefficients = sine_coefficients_of_points(seed, hz, sine_count=M)
+    wave = np.zeros_like(t)
+    bend_depths = np.random.uniform(0, max_bend, M)
+    bend_osc = np.random.uniform(0, max_osc, M)
+    for k in range(1, M + 1):
+        wave += coefficients[k - 1] * sine_bend_centered_with_time(tim, k / wavelength, bend_depths[k - 1], bend_osc[k - 1], sr)
+
+    wave /= np.max(np.abs(wave))
+    return tim, seed, wave
 
 def random_smoothed_with_flutter(vol, duration, hz, sr, shift=0, n=13, M=17, max_flutter_freq=10):
     t = np.linspace(0, duration, int(duration * sr))
@@ -290,6 +347,20 @@ def random_smoothed_with_flutter(vol, duration, hz, sr, shift=0, n=13, M=17, max
         wave += np.sin(2 * np.pi * flutter_freqs[k - 1] * t) * coefficients[k - 1] * np.sin(2 * np.pi * k / wavelength * t)
     wave /= np.max(np.abs(wave), axis=0)
     return t, seed, wave
+
+def random_smoothed_with_bend_and_flutter_with_time(vol, tim, hz, sr, shift=0, n=13, M=17, max_bend=.3, max_bend_osc=5, max_flutter_freq=10):
+    wavelength = 1.0 / hz
+    seed = np.random.uniform(-1, 1, n)
+    coefficients = sine_coefficients_of_points(seed, hz, sine_count=M)
+    wave = np.zeros_like(tim)
+    bend_depths = np.random.uniform(0, max_bend, M)
+    bend_osc = np.random.uniform(0, max_bend_osc, M)
+    flutter_freqs = np.random.uniform(0, max_flutter_freq, M)
+    for k in range(1, M + 1):
+        wave += coefficients[k - 1] * np.sin(2 * np.pi * flutter_freqs[k - 1] * tim) * sine_bend_centered_with_time(tim, k / wavelength, bend_depths[k-1], bend_osc[k-1], sr)
+    wave /= np.max(np.abs(wave), axis=0)
+    return tim, seed, wave
+
 
 def sine_bend_centered(duration, freq, bend_dist, osc_freq, sr):
     """
@@ -306,6 +377,16 @@ def sine_bend_centered(duration, freq, bend_dist, osc_freq, sr):
     theta = lambda tau: freq_carrier * tau - p / freq_message * np.cos(freq_message * tau)
     return np.sin(theta(t))
 
+def sine_bend_centered_with_time(tim, freq, bend_dist, osc_freq, sr):
+    start = time.time()
+    freq_carrier = 2 * np.pi * freq
+    freq_message = 2 * np.pi * osc_freq
+    p = 2 * np.pi * freq * (2 ** (bend_dist / 12) - 1)
+    theta = lambda tau: freq_carrier * tau - p / freq_message * np.cos(freq_message * tau)
+    result = np.sin(theta(tim))
+    print("sin(theta(t)): {}".format(time.time() - start))
+    return result
+
 def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
     assert duration > 0, "Duration must be greater than 0"
     wave = np.zeros((int(sr * duration), 2))
@@ -317,6 +398,7 @@ def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
     return t, seeds, wave / np.max(np.abs(wave))
 
 def combine_bendy(vol, duration, freqs, sr, shift=0, n=13, M=17, max_bend=.3, max_osc=5):
+
     wave = np.zeros((int(sr * duration), 2))
     seeds = []
     for freq in freqs:
@@ -324,6 +406,46 @@ def combine_bendy(vol, duration, freqs, sr, shift=0, n=13, M=17, max_bend=.3, ma
         seeds.append(s)
         wave += w
     return t, seeds, wave / np.max(np.abs(wave))
+
+def combine_bendy_lr(vol, duration, freqs, sr, shift=0, n=13, M=15, max_bend=.3, max_osc=5):
+    t = np.linspace(0, duration, int(sr * duration))
+    left = np.zeros(int(sr * duration))
+    right = np.zeros(int(sr * duration))
+    seeds = []
+    compute_durations = []
+    for freq in freqs:
+        start = time.time()
+        t, s_l, w_l = random_smoothed_with_bend_with_time(vol, t, freq, sr, shift=shift, n=n, M=M, max_bend=max_bend, max_osc=max_osc)
+        compute_durations.append(time.time() - start)
+        start = time.time()
+        t, s_r, w_r = random_smoothed_with_bend_with_time(vol, t, freq, sr, shift=shift, n=n, M=M, max_bend=max_bend, max_osc=max_osc)
+        compute_durations.append(time.time() - start)
+        seeds.extend([s_l, s_r])
+        left += w_l
+        right += w_r
+    left /= np.max(np.abs(left), axis=0)
+    right /= np.max(np.abs(right), axis=0)
+    print(compute_durations)
+    print(np.mean(compute_durations))
+    print(np.std(compute_durations))
+    return t, seeds, np.array([left, right]).T
+
+def combine_bendy_fluttered_lr(vol, duration, freqs, sr, shift=0, n=13, M=15, max_bend=.3, max_osc=5, max_flutter_freq=10):
+    t = np.linspace(0, duration, int(sr * duration))
+    left = np.zeros(int(sr * duration))
+    right = np.zeros(int(sr * duration))
+    seeds = []
+    flutter_freqs = np.random.uniform(0, max_flutter_freq, M)
+    for freq in freqs:
+        t, s_l, w_l = random_smoothed_with_bend_and_flutter_with_time(vol, t, freq, sr, shift=shift, n=n, M=M, max_bend=max_bend, max_bend_osc=max_osc, max_flutter_freq=max_flutter_freq)
+        t, s_r, w_r = random_smoothed_with_bend_and_flutter_with_time(vol, t, freq, sr, shift=shift, n=n, M=M, max_bend=max_bend, max_bend_osc=max_osc, max_flutter_freq=max_flutter_freq)
+        seeds.extend([s_l, s_r])
+        left += w_l
+        right += w_r
+    left /= np.max(np.abs(left), axis=0)
+    right /= np.max(np.abs(right), axis=0)
+    return t, seeds, np.array([left, right]).T
+        
 
 def combine_random_smoothed_lr(vol, duration, freqs, sr, shift=0, n=17, M=15):
     """
@@ -351,7 +473,7 @@ def combine_flutter(vol, duration, freqs, sr, shift=0, n=17, M=15, max_flutter_f
         t, s_r, w_r = random_smoothed_with_flutter(vol, duration, freq, sr, shift=shift, n=n, M=M, max_flutter_freq=max_flutter_freq)
         seeds.extend([s_l, s_r])
         left += w_l
-        right += w_r
+        right += w_e
     left /= np.max(np.abs(left))
     right /= np.max(np.abs(right))
     return t, seeds, np.array([left, right]).T
@@ -364,6 +486,29 @@ def generate_frequency_drift(freq_kernel: list[float], drift_max: float=.1, drif
         frequencies.extend(map(lambda e: freq * 2 ** e, drift_exponents))
     return frequencies
 
+def compress(audio, sr, method="peaks"):
+    """
+    """
+    if method == "peaks":
+        forward = audio[1:] > audio[:-1]
+        backward = audio[:-1] > audio[1:]
+        row_maxima, col_maxima = np.where((backward[1:] * forward[:-1]) == True)
+        row_maxima += 1
+        row_minima, col_minima = np.where((backward[:-1] * forward[1:]) == True)
+        row_minima += 1
+
+        left_row_minima = np.array([row for row, col in zip(row_minima, col_minima) if col == 0])
+        left_row_maxima = np.array([row for row, col in zip(row_maxima, col_maxima) if col == 0])
+
+        right_row_minima = np.array([row for row, col in zip(row_minima, col_minima) if col == 1])
+        right_row_maxima = np.array([row for row, col in zip(row_maxima, col_maxima) if col == 1])
+        fig, ax = plt.subplots(figsize=(16, 9))
+
+def get_wavetable(filename) -> dict|None:
+    with open(filename, "r") as f:
+        data = json.load(f)
+        return data
+        
 
 def all_pass(
     audio: np.ndarray
