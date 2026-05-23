@@ -18,6 +18,29 @@ np.random.seed(0)
 
 AUDIO_DIR = "audio"
 
+F = 43.653528929125486
+
+SAMPLE_RATE=44100
+
+def _build_note_map():
+    note_letters = ["F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#", "E"]
+    base_notes = list(map(lambda index: (index + 1) * 100, range(0, len(note_letters))))
+    note_map = {}
+    for i in range(7):
+        numbered_letters = list(map(lambda note: note + str(i + 1), note_letters))
+        frequencies = list(map(lambda f: f * 2 ** i, base_notes))
+        note_map |= dict(zip(numbered_letters, frequencies))
+    return note_map
+
+def _build_wavetables(sr=SAMPLE_RATE):
+    E = F * 2 ** (-1/12)
+    frequency_spectrum = [E * 2 ** (i / 1200) for i in range(1200 * 7 + 200)]
+    note_map = _build_note_map()
+    waves = [random_smoothed(1, 1 / hz, hz, sr, n=17, M=13)[2][:, 0] for hz in frequency_spectrum]
+    return note_map, waves
+
+NOTE_MAP, WAVETABLES = _build_wavetables()
+
 def integrate(f, a, b, n):
     dx = (b - a) / n
     total = 0
@@ -95,31 +118,28 @@ def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granu
         drift_factor = 10
     elif drift_granularity == "hundredths":
         drift_factor = 1
-    note_map = build_note_map()
+    note_map = _build_note_map()
     drifts_tenths = np.abs(drifts_tenths)
     n_samples = int(sr * duration)
     t_indices = np.linspace(0, n_samples, n_samples, dtype=int)
     left = np.zeros_like(t_indices)
     right = np.zeros_like(t_indices)
     wave_index_offsets = np.array([i for i in range(-drifts_tenths*drift_factor, drifts_tenths*drift_factor+1, drift_factor)])
+    wavelength_samples = list(map(len, WAVETABLES))
     for note in notes:
+        # Needs to be integer not float
         wave_base_index = note_map[note]
         for i, wave_index_offset in enumerate(wave_index_offsets):
             wave_current_index = wave_base_index + wave_index_offset
             wave_samples = wavelength_samples[wave_current_index]
             indices_modulo = t_indices % wave_samples
             if i % 2 == 0:
-                left = left + waves[wave_current_index][indices_modulo]
+                left = left + WAVETABLES[wave_current_index][indices_modulo]
             else:
-                right = right + waves[wave_current_index][indices_modulo]
+                right = right + WAVETABLES[wave_current_index][indices_modulo]
     wave = np.array([left, right]).T
     wave /= np.max(np.abs(wave), axis=0)
     return vol * wave
-
-def build_wavetables():
-    F = 43.653528929125486
-    E = F * 2 ** (-1/12)
-    frequency_spectrum = [E * 2 ** (i/12) for i in range(1200 * 7 + 200)]
 
 
 def threshold_filter(audio, threshold_amplitude_percentage=.1):
@@ -131,20 +151,7 @@ def threshold_filter(audio, threshold_amplitude_percentage=.1):
     back = np.fft.ifft(freq, axis=0).real
     back /= np.max(np.abs(back), axis=0)
     return back
-
-def build_note_map():
-    F = 43.653528929125486
-    note_letters = ["F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#", "E"]
-    base_notes = list(map(lambda index: F * 2 ** (index/12), range(0, len(note_letters))))
-    note_map = {}
-    for i in range(7):
-        numbered_letters = list(map(lambda note: note + str(i + 1), note_letters))
-        frequencies = list(map(lambda f: f * 2 ** i, base_notes))
-        note_map |= dict(zip(numbered_letters, frequencies))
-    return note_map
-
-
-
+    
 def delay(audio, samples_ahead, num_delays=4, decay_fraction=.8, decay_base=2, sr=44100):
     """
     Here's the idea: take a signal and add some number of delays some multiples
