@@ -20,17 +20,40 @@ AUDIO_DIR = "audio"
 
 F = 43.653528929125486
 
-SAMPLE_RATE=44100
+SAMPLE_RATE = 44100
 
 def _build_note_map():
     note_letters = ["F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#", "E"]
-    base_notes = list(map(lambda index: (index + 1) * 100, range(0, len(note_letters))))
+    base_indices = list(map(lambda index: (index + 1) * 100, range(0, len(note_letters))))
     note_map = {}
     for i in range(7):
         numbered_letters = list(map(lambda note: note + str(i + 1), note_letters))
-        frequencies = list(map(lambda f: f * 2 ** i, base_notes))
-        note_map |= dict(zip(numbered_letters, frequencies))
+        indices = list(map(lambda index: index + 1200 * i, base_indices))
+        note_map |= dict(zip(numbered_letters, indices))
     return note_map
+
+def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
+    assert duration > 0, "Duration must be greater than 0"
+    wavelength = 1.0 / hz
+    t = np.linspace(0, duration, int(duration*sr))
+    s = np.random.uniform(-1, 1, n)
+    s = np.concatenate((s, [s[0]]))
+    js = np.array([i for i in range(1, n + 1)])
+    lowers = (js - 1) * wavelength / n
+    uppers = js * wavelength / n
+    ms = n / wavelength * (s[1:] - s[:-1])
+    coefficients = np.zeros(M)
+    wave = np.zeros_like(t)
+    for k in range(1, M + 1):
+        alpha_k = 2 * np.pi * k / wavelength
+        segments = -1 / alpha_k * (ms * wavelength / n + s[:-1]) * np.cos(alpha_k * uppers) + s[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
+        wave += coefficients[k - 1] * np.sin(alpha_k * t)
+    #plt.plot(t, np.interp(t, np.linspace(0, 1.0/wavelength, len(s) - 1), s[:-1], period=1/wavelength))
+    wave /= np.max(np.abs(wave))
+    wave = np.array([wave, wave]).T
+    return t, s, wave 
+
 
 def _build_wavetables(sr=SAMPLE_RATE):
     E = F * 2 ** (-1/12)
@@ -139,6 +162,7 @@ def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granu
                 right = right + WAVETABLES[wave_current_index][indices_modulo]
     wave = np.array([left, right]).T
     wave /= np.max(np.abs(wave), axis=0)
+    wave = threshold_filter(wave)
     return vol * wave
 
 
@@ -308,28 +332,6 @@ def sine_coefficients_of_points(points_seed: np.ndarray, hz: float, sine_count=1
         coefficients[k - 1] = 2 / wavelength * np.sum(segments)
     return coefficients
 
-
-def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
-    assert duration > 0, "Duration must be greater than 0"
-    wavelength = 1.0 / hz
-    t = np.linspace(0, duration, int(duration*sr))
-    s = np.random.uniform(-1, 1, n)
-    s = np.concatenate((s, [s[0]]))
-    js = np.array([i for i in range(1, n + 1)])
-    lowers = (js - 1) * wavelength / n
-    uppers = js * wavelength / n
-    ms = n / wavelength * (s[1:] - s[:-1])
-    coefficients = np.zeros(M)
-    wave = np.zeros_like(t)
-    for k in range(1, M + 1):
-        alpha_k = 2 * np.pi * k / wavelength
-        segments = -1 / alpha_k * (ms * wavelength / n + s[:-1]) * np.cos(alpha_k * uppers) + s[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
-        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
-        wave += coefficients[k - 1] * np.sin(alpha_k * t)
-    #plt.plot(t, np.interp(t, np.linspace(0, 1.0/wavelength, len(s) - 1), s[:-1], period=1/wavelength))
-    wave /= np.max(np.abs(wave))
-    wave = np.array([wave, wave]).T
-    return t, s, wave 
 
 def random_smoothed_with_time(vol, tim, hz, sr, shift=0, n=5, M=17):
     assert len(tim) > 0, "Duration must be greater than zero"
@@ -818,8 +820,8 @@ if __name__ == "__main__":
     berg = bergunde[:2*sr]
     #berg = bergunde
     #berg = np.array([berg, berg]).T
-    orig = play(berg)
-    reverbed = reverb(bergunde, 8, [.004, .07], 4, sr)
-    effect = play(reverbed)
-    effect.play()
+    #orig = play(berg)
+    #reverbed = reverb(bergunde, 8, [.004, .07], 4, sr)
+    #effect = play(reverbed)
+    #effect.play()
 
