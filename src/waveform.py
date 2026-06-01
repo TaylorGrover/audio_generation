@@ -32,6 +32,24 @@ def _build_note_map():
         note_map |= dict(zip(numbered_letters, indices))
     return note_map
 
+def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
+    t = np.linspace(0, duration, int(sr * duration))
+    wavelength = 1.0 / hz
+    coefficients = np.zeros(sine_count)
+    n_points = len(seed) - 1
+    ms = (seed[1:] - seed[:-1]) * n_points / wavelength
+    js = np.array([i for i in range(1, n_points + 1)])
+    lowers = (js - 1) * wavelength / n_points
+    uppers = js * wavelength / n_points
+    wave = np.zeros_like(t)
+    for k in range(1, sine_count + 1):
+        alpha_k = 2 * np.pi * k / wavelength
+        segments = -(ms * wavelength / (alpha_k * n_points) + seed[:-1] / alpha_k) * np.cos(alpha_k * uppers) + seed[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
+        wave += coefficients[k - 1] * np.sin(alpha_k * t)
+    wave = vol * wave / np.max(np.abs(wave))
+    return vol * np.array([wave, wave]).T
+
 def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
     assert duration > 0, "Duration must be greater than 0"
     wavelength = 1.0 / hz
@@ -56,10 +74,21 @@ def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
 
 
 def _build_wavetables(sr=SAMPLE_RATE):
-    E = F * 2 ** (-1/12)
-    frequency_spectrum = [E * 2 ** (i / 1200) for i in range(1200 * 7 + 200)]
     note_map = _build_note_map()
-    waves = [random_smoothed(1, 1 / hz, hz, sr, n=17, M=13)[2][:, 0] for hz in frequency_spectrum]
+    wavetable_path = os.path.join(AUDIO_DIR, "wavetable", "wavetable.json")
+    if not os.path.isfile(wavetable_path):
+        E = F * 2 ** (-1/12)
+        frequency_spectrum = [E * 2 ** (i / 1200) for i in range(1200 * 7 + 200)]
+        left_seeds, right_seeds = np.random.uniform(-1, 1, (2, 100, 15))
+        indices = np.array([i for i in range(1200 * 7 + 200)]) % 100
+        left_seeds = left_seeds[indices]
+        right_seeds = right_seeds[indices]
+        left_waves = [seeded_waveform(1, 1 / hz, hz, seed, sr, sine_count=13)[:, 0] for (seed, hz) in zip(left_seeds, frequency_spectrum)]
+        right_waves = [seeded_waveform(1, 1 / hz, hz, seed, sr, sine_count=13)[:, 0] for (seed, hz) in zip(right_seeds, frequency_spectrum)]
+        waves = [left_waves, right_waves]
+    else:
+        with open(wavetable_path, "r") as f:
+            waves = json.load(f)
     return note_map, waves
 
 NOTE_MAP, WAVETABLES = _build_wavetables()
@@ -114,23 +143,29 @@ def combined_random_waveforms(vol, duration, frequencies, sr, shift=0, n_points=
         wave += seeded_waveform(vol, duration, freq, s, sr, sine_count)
     return vol * wave / np.max(np.abs(wave))
 
-def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
-    t = np.linspace(0, duration, int(sr * duration))
-    wavelength = 1.0 / hz
-    coefficients = np.zeros(sine_count)
-    n_points = len(seed) - 1
-    ms = (seed[1:] - seed[:-1]) * n_points / wavelength
-    js = np.array([i for i in range(1, n_points + 1)])
-    lowers = (js - 1) * wavelength / n_points
-    uppers = js * wavelength / n_points
-    wave = np.zeros_like(t)
-    for k in range(1, sine_count + 1):
-        alpha_k = 2 * np.pi * k / wavelength
-        segments = -(ms * wavelength / (alpha_k * n_points) + seed[:-1] / alpha_k) * np.cos(alpha_k * uppers) + seed[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
-        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
-        wave += coefficients[k - 1] * np.sin(alpha_k * t)
-    wave = vol * wave / np.max(np.abs(wave))
-    return vol * np.array([wave, wave]).T
+def classic_envelope(audio, attack_ms, decay_ms, release_ms, sustain_fraction, sr):
+    """
+    TODO: Should the audio be required to be at least as long as the 
+    attack_ms + decay_ms + release_ms
+    """
+    copied_audio = copy.copy(audio)
+    attack_samples = int(sr * attack_ms)
+    decay_samples = int(sr * decay_ms)
+    release_samples = int(sr * release_ms)
+    attack = np.linspace(0, 1, attack_samples).reshape(-1, 1)
+    decay = np.linspace(1, sustain_fraction, decay_samples).reshape(-1, 1)
+    release = np.linspace(sustain_fraction, 0, release_samples).reshape(-1, 1)
+    copied_audio[:attack_samples] *= attack
+    copied_audio[attack_samples:attack_samples+decay_samples] *= decay
+    copied_audio[attack_samples+decay_samples:-release_samples] *= sustain_fraction
+    copied_audio[-release_samples:] *= release
+    return copied_audio
+
+def gen_envelope(duration, amplitudes, sr):
+    x = np.linspace(0, duration, int(duration * sr))
+    xp = np.linspace(0, duration, len(amplitudes))
+    return np.interp(x, xp, amplitudes).reshape(-1, 1)
+
 
 def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granularity="hundredths"):
     if drift_granularity.lower() not in ["tenths", "hundredths"]:
@@ -148,7 +183,8 @@ def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granu
     left = np.zeros_like(t_indices)
     right = np.zeros_like(t_indices)
     wave_index_offsets = np.array([i for i in range(-drifts_tenths*drift_factor, drifts_tenths*drift_factor+1, drift_factor)])
-    wavelength_samples = list(map(len, WAVETABLES))
+    left_wavetable, right_wavetable = WAVETABLES
+    wavelength_samples = list(map(len, left_wavetable))
     for note in notes:
         # Needs to be integer not float
         wave_base_index = note_map[note]
@@ -156,15 +192,13 @@ def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granu
             wave_current_index = wave_base_index + wave_index_offset
             wave_samples = wavelength_samples[wave_current_index]
             indices_modulo = t_indices % wave_samples
-            if i % 2 == 0:
-                left = left + WAVETABLES[wave_current_index][indices_modulo]
-            else:
-                right = right + WAVETABLES[wave_current_index][indices_modulo]
+            left = left + left_wavetable[wave_current_index][indices_modulo]
+            right = right + right_wavetable[wave_current_index][indices_modulo]
     wave = np.array([left, right]).T
     wave /= np.max(np.abs(wave), axis=0)
-    wave = threshold_filter(wave)
+    wave = threshold_filter(wave, threshold_amplitude_percentage=1)
+    wave = classic_envelope(wave, .01, .02, .02, .8, sr)
     return vol * wave
-
 
 def threshold_filter(audio, threshold_amplitude_percentage=.1):
     freq = np.fft.fft(audio, axis=0)
@@ -415,6 +449,9 @@ def sine_bend_centered_with_time(tim, freq, bend_dist, osc_freq, sr):
     result = np.sin(theta(tim))
     print("sin(theta(t)): {}".format(time.time() - start))
     return result
+
+def tri_bend_centered_with_time(tim, freq, bend_dist, osc_freq, sr):
+    return np.arcsin(sine_bend_centered_with_time(tim, freq, bend_dist, osc_freq, sr))
 
 def combine_random_smoothed(vol, duration, freqs, sr, shift=0, n=17, M=15):
     assert duration > 0, "Duration must be greater than 0"
@@ -808,7 +845,137 @@ class Waveform:
     def __repr__(self):
         return repr(self.array)
 
+
+def harmonics(amplitude, duration, tonal_center, dumb, idk, key):
+    note_names = np.array(list(NOTE_MAP.keys()))
+    offsets = np.array(key)
+    note_index = 9
+    letters = note_names[note_index + offsets]
+    return get_drift(.8 * amplitude, duration, letters, 25)
+
         
+def hemorrhage_test():
+    bpm = 155
+    bps = 155/60
+    root = "D1"
+    sample_rate = 44100
+    n=1
+
+    sequence = [
+        harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[4, 7])
+        , harmonics(0, 2 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, .5 / (bpm / 60), root, sample_rate, n, key=[ 4, 7])
+        , harmonics(1, .5 / (bpm / 60), root, sample_rate, n, key=[ 5, 8])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ 4, 7])
+        , harmonics(0, 1 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ 5, 8])
+        , harmonics(0, 1 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ 7, 11])
+        , harmonics(0, 2 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, .5 / (bpm / 60), root, sample_rate, n, key=[ 7, 11])
+        , harmonics(1, .5 / (bpm / 60), root, sample_rate, n, key=[ 8, 12])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ 7, 11])
+        , harmonics(0, 1 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ 5, 8])
+        , harmonics(0, 1 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ -2, 1])
+        , harmonics(0, 2 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ -4, 0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ 0, 4])
+        , harmonics(0, 1 / (bpm / 60), root, sample_rate, n, key=[0])
+        , harmonics(1, 1 / (bpm / 60), root, sample_rate, n, key=[ -1, 3])
+        , harmonics(0, 1 / (bpm / 60), root, sample_rate, n, key=[0])
+
+        , get_drift(1, 3/bps, ["D1", "F#2", "A2"], 20)
+        , get_drift(1, .5/bps, ["D1", "F#2", "A2"], 30)
+        , get_drift(1, .5/bps, ["D1", "G2", "A2"], 30)
+        , get_drift(1, 2/bps, ["D1", "F#2", "A2"], 20)
+        , get_drift(1, 2/bps, ["D1", "G2", "A2"], 20)
+        , get_drift(1, 3/bps, ["C1", "A2"], 20)
+        , get_drift(1, .5/bps, ["C1", "A2"], 30)
+        , get_drift(1, .5/bps, ["C1", "A#2"], 30)
+        , get_drift(1, 2/bps, ["C1", "A2"], 20)
+        , get_drift(1, 2/bps, ["C1", "G2"], 20)
+        , get_drift(1, 3/bps, ["D#1", "C2"], 20)
+        , get_drift(1, 1/bps, ["D#1", "A#2"], 20)
+        , get_drift(1, 2/bps, ["F2", "A#2", "D2"], 20)
+        , get_drift(1, 2/bps, ["F#1", "C#1", "F#2", "C#2"], 20)
+
+        , get_drift(1, 3/bps, ["D1", "F#2", "A2"], 20)
+        , get_drift(1, .5/bps, ["D1", "F#2", "A2"], 30)
+        , get_drift(1, .5/bps, ["D1", "G2", "A2"], 30)
+        , get_drift(1, 2/bps, ["D1", "F#2", "A2"], 20)
+        , get_drift(1, 2/bps, ["D1", "G2", "A2"], 20)
+        , get_drift(1, 3/bps, ["C1", "A2"], 20)
+        , get_drift(1, .5/bps, ["C1", "A2"], 30)
+        , get_drift(1, .5/bps, ["C1", "A#2"], 30)
+        , get_drift(1, 2/bps, ["C1", "A2"], 20)
+        , get_drift(1, 2/bps, ["C1", "G2"], 20)
+        , get_drift(1, 3/bps, ["D#1", "C2"], 20)
+        , get_drift(1, 1/bps, ["D#1", "A#2"], 20)
+        , get_drift(1, 2/bps, ["F2", "A#2", "D2"], 20)
+        , get_drift(1, 2/bps, ["F#1", "C#1", "F#2", "C#2"], 20)
+
+        , harmonics(1, 4/bps, root, sample_rate, n, key=[1, 8, 17])
+        , harmonics(1, 4/bps, root, sample_rate, n, key=[0, 7, 16])
+        , harmonics(1, 3/bps, root, sample_rate, n, key=[1, 8, 13])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[0, 7, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, 4/bps, root, sample_rate, n, key=[0, 7, 12])
+        , harmonics(1, 4/bps, root, sample_rate, n, key=[1, 8, 17])
+        , harmonics(1, 4/bps, root, sample_rate, n, key=[5, 12, 20])
+        , harmonics(1, 3/bps, root, sample_rate, n, key=[3, 10, 19])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 13])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 13])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 10, 17])
+        , harmonics(1, 3/bps, root, sample_rate, n, key=[0, 7, 12, 16])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[1, 8, 13])
+        , harmonics(1, 3/bps, root, sample_rate, n, key=[0, 7, 12])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .25/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 13])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 10])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, .5/bps, root, sample_rate, n, key=[-2, 5, 13])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 12])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[-2, 5, 10, 17])
+        , harmonics(1, 3/bps, root, sample_rate, n, key=[0, 7, 12, 16])
+        , harmonics(1, 1/bps, root, sample_rate, n, key=[1, 8, 13])
+        , harmonics(1, 3/bps, root, sample_rate, n, key=[0, 7, 12])
+    ]
+    wave = np.concatenate(sequence, axis=0)
+    return wave
+
 
 
 if __name__ == "__main__":

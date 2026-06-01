@@ -2,7 +2,7 @@ if (MATH_LIBRARY)
 	link_libraries("${MATH_LIBRARY}")
 endif()
 
-add_executable(Sampler WIN32 MACOSX_BUNDLE Sampler.cpp ${SAMPLER_WINDOW} ${DIAL})
+add_executable(Sampler WIN32 MACOSX_BUNDLE Sampler.cpp ${SAMPLER_WINDOW} ${DIAL} ${WAVEFORM})
 
 
 find_library(LIBRT rt)

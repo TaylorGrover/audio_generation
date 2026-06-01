@@ -264,6 +264,30 @@ __/deps/sampler_window.cpp.s:
 	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/sampler_window.cpp.s
 .PHONY : __/deps/sampler_window.cpp.s
 
+__/deps/waveform.o: __/deps/waveform.cpp.o
+.PHONY : __/deps/waveform.o
+
+# target to build an object file
+__/deps/waveform.cpp.o:
+	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/waveform.cpp.o
+.PHONY : __/deps/waveform.cpp.o
+
+__/deps/waveform.i: __/deps/waveform.cpp.i
+.PHONY : __/deps/waveform.i
+
+# target to preprocess a source file
+__/deps/waveform.cpp.i:
+	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/waveform.cpp.i
+.PHONY : __/deps/waveform.cpp.i
+
+__/deps/waveform.s: __/deps/waveform.cpp.s
+.PHONY : __/deps/waveform.s
+
+# target to generate assembly for a file
+__/deps/waveform.cpp.s:
+	cd /home/jonaz/Documents/prog/audio_generation && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/Sampler.dir/build.make src/CMakeFiles/Sampler.dir/__/deps/waveform.cpp.s
+.PHONY : __/deps/waveform.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -288,6 +312,9 @@ help:
 	@echo "... __/deps/sampler_window.o"
 	@echo "... __/deps/sampler_window.i"
 	@echo "... __/deps/sampler_window.s"
+	@echo "... __/deps/waveform.o"
+	@echo "... __/deps/waveform.i"
+	@echo "... __/deps/waveform.s"
 .PHONY : help
 
 

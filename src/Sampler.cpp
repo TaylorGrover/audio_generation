@@ -3,6 +3,7 @@
 #include <qt5/QtWidgets/QWidget>
 #include <qt5/QtWidgets/QApplication>
 #include "sampler_window.h"
+#include "waveform.h"
 
 int main(int argc, char *argv[]) {
 

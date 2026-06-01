@@ -18,7 +18,7 @@ void SamplerMain::setup()
     // Set window style
     QString styleString(
         "QWidget {"\
-        "   background: #888888;"\
+        "   background: #000108;"\
         "}"\
         "QPushButton {"\
         "   color: #ffffff;"\

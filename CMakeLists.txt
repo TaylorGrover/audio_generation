@@ -81,6 +81,9 @@ endif()
 set(SAMPLER_WINDOW "${Sampler_SOURCE_DIR}/deps/sampler_window.h"
                    "${Sampler_SOURCE_DIR}/deps/sampler_window.cpp")
 
+set(WAVEFORM "${Sampler_SOURCE_DIR}/deps/waveform.h"
+             "${Sampler_SOURCE_DIR}/deps/waveform.cpp")
+
 set(DIAL "${Sampler_SOURCE_DIR}/deps/dial.h"
          "${Sampler_SOURCE_DIR}/deps/dial.cpp")
 
