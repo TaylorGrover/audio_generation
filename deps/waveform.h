@@ -7,17 +7,18 @@
 
 class Signal {
 private:
-    std::vector<float> signal;
+    std::vector<float> amplitudes;
 
 public:
-    Signal(std::vector<float>& sig) : signal(sig) {}; 
+    Signal(std::vector<float>& amplitudes) : amplitudes(amplitudes) {}; 
+    Signal();
 
     Signal operator+ ( const Signal& rhs );
     Signal& operator+=( const Signal& rhs );
 
     const size_t size(); 
 
-    const Signal& getSignal();
+    const Signal& getAmplitudes();
 
     void writeWAV(std::string &filename);
 };
