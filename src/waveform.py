@@ -1034,10 +1034,9 @@ def hemorrhage_test():
 if __name__ == "__main__":
     fig, ax = plt.subplots(figsize=(16, 9))
     sr = 44100
-    bergunde, _ = sf.read("/home/jonaz/Music/Taylor Grooves/The Bergunde Asmodeus.mp3")
-    #bergunde, _ = sf.read("/home/jonaz/Documents/REAPER Media/01-Taylor-230417_1049.wav")
+    bergunde, _ = sf.read("audio/acoustic_guitar.mp3")
     tap, _ = sf.read("audio/tap.wav")
-    berg = bergunde[:2*sr]
+    #berg = bergunde[:2*sr]
     #berg = bergunde
     #berg = np.array([berg, berg]).T
     #orig = play(berg)
