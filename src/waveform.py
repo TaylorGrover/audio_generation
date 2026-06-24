@@ -50,6 +50,25 @@ def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
     wave = vol * wave / np.max(np.abs(wave))
     return vol * np.array([wave, wave]).T
 
+def random_smoothed_test(vol, duration, hz, sr, shift=0, n=15, M=13):
+    assert duration > 0, "Duration must be greater than 0"
+    wavelengths = 1.0 / hz
+    t = np.linspace(0, duration, int(duration * sr))
+    s = np.random.uniform(-1, 1, n)
+    s = np.concatenate([s, [s[0]]])
+    js = np.linspace(1, n, n)
+    lowers = (js - 1) * wavelengths / n
+    uppers = js * wavelength / n
+    ms = n / wavelength * (s[1:] - s[:-1])
+    alpha_ks = (2 * np.pi * np.linspace(1, M, M) / wavelength).reshape(-1, 1)
+    segments = -1 / alpha_ks * (ms * wavelength / n + s[:-1]) * np.cos(alpha_ks * uppers) + s[:-1] / alpha_ks * np.cos(alpha_ks * lowers) + ms / alpha_ks ** 2 * np.sin(alpha_ks * uppers) - ms / alpha_ks ** 2 * np.sin(alpha_ks * lowers)
+    coefficients = segments.sum(axis=1).reshape(-1, 1)
+    wave = np.sum(coefficients * np.sin(alpha_ks * t), axis=0)
+    wave *= vol
+    wave /= np.max(np.abs(wave), axis=0)
+    return np.array([wave, wave]).T
+
+
 def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
     assert duration > 0, "Duration must be greater than 0"
     wavelength = 1.0 / hz
@@ -109,6 +128,13 @@ def sine(vol, duration, hz, sr, shift=0):
     return vol * np.sin(2 * np.pi * hz * t - 2 * np.pi * hz * shift)
 
 
+# Sawtooth sine series
+def sawtooth_fs(vol, duration, hz, sr, N=5):
+    t = np.linspace(0, duration, int(duration * sr))
+    ns = np.linspace(1, N, N).reshape(-1, 1)
+    ns_matrix = np.outer(2 * np.pi * hz * ns, t)
+    return vol * np.sum(-2 / np.pi * np.sin(ns_matrix) / ns, axis=0)
+
 def square(vol, duration, hz, sr, shift=0):
     diff = sawtooth(vol, duration, hz, sr, shift=shift)
     geq = diff >= 0
@@ -116,6 +142,15 @@ def square(vol, duration, hz, sr, shift=0):
     neg = -1.0 * (~geq)
     return vol * (pos + neg)
 
+def square_fs(vol, duration, hz, sr, N=5):
+    t = np.linspace(0, duration, int(sr * duration))
+    ns = np.linspace(1, N, N).reshape(-1, 1)
+    ns_alt = 2 * ns - 1
+    ns_matrix = np.outer(ns_alt, t)
+    arg = 2 * np.pi * hz * ns_matrix
+    wave = np.sum(4 * np.sin(arg) / np.pi / ns_alt, axis=0)
+    wave /= np.max(np.abs(wave), axis=0)
+    return vol * wave
 
 def sawtooth(vol, duration, hz, sr, shift=0, form="positive"):
     assert duration > 0
@@ -195,10 +230,11 @@ def get_drift(vol, duration, notes: list[str], drifts_tenths: int=3, drift_granu
             left = left + left_wavetable[wave_current_index][indices_modulo]
             right = right + right_wavetable[wave_current_index][indices_modulo]
     wave = np.array([left, right]).T
-    wave /= np.max(np.abs(wave), axis=0)
     wave = threshold_filter(wave, threshold_amplitude_percentage=1)
     wave = classic_envelope(wave, .01, .02, .02, .8, sr)
-    return vol * wave
+    wave = vol * wave
+    wave /= np.max(np.abs(wave), axis=0)
+    return wave
 
 def threshold_filter(audio, threshold_amplitude_percentage=.1):
     freq = np.fft.fft(audio, axis=0)
@@ -259,12 +295,29 @@ def hard_filter(audio: np.ndarray, lower_freq, upper_freq, fraction, sr, normali
     upper_index = int(upper_freq * n / sr)
     freq_filter = np.ones((n // 2, 2))
     freq_filter[lower_index:upper_index+1] = fraction
-    frequencies[:n//2] *= freq_filter
+    frequencies[:n/2] *= freq_filter
     frequencies[n//2:] *= freq_filter[::-1]
     filtered = fft.ifft(frequencies, axis=0).real
     if normalize:
         filtered /= np.max(np.abs(filtered))
     return filtered
+
+def pitch_shift_freq(wave: np.ndarray, amount_cents: float) -> np.ndarray:
+    """
+    Just shift the first half of the FFT array
+    """
+    n = len(wave)
+    freq = np.fft.fft(wave, axis=0)
+    new_freq = np.zeros_like(freq)
+    shift_factor = 2 ** (amount_cents / 1200)
+    max_index = min(int(n / shift_factor), n)
+    new_indices = np.array([round(i * shift_factor) for i in range(n // 2)])
+    low_index = np.min(np.where(new_indices >= n // 2)[0])
+    orig_indices = np.array([i for i in range(low_index)])
+    new_freq[new_indices[:low_index]] = freq[orig_indices]
+    new_wave = np.fft.ifft(new_freq, axis=0).real
+    new_wave /= np.max(np.abs(new_wave), axis=0)
+    return new_wave
 
 def phaser(
     audio: np.ndarray,
@@ -539,7 +592,7 @@ def combine_flutter(vol, duration, freqs, sr, shift=0, n=17, M=15, max_flutter_f
         t, s_r, w_r = random_smoothed_with_flutter(vol, duration, freq, sr, shift=shift, n=n, M=M, max_flutter_freq=max_flutter_freq)
         seeds.extend([s_l, s_r])
         left += w_l
-        right += w_e
+        right += w_r
     left /= np.max(np.abs(left))
     right /= np.max(np.abs(right))
     return t, seeds, np.array([left, right]).T
