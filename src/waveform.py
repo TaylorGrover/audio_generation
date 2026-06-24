@@ -110,7 +110,8 @@ def _build_wavetables(sr=SAMPLE_RATE):
             waves = json.load(f)
     return note_map, waves
 
-NOTE_MAP, WAVETABLES = _build_wavetables()
+if __name__ == "__main__":
+    NOTE_MAP, WAVETABLES = _build_wavetables()
 
 def integrate(f, a, b, n):
     dx = (b - a) / n
@@ -1034,8 +1035,8 @@ def hemorrhage_test():
 if __name__ == "__main__":
     fig, ax = plt.subplots(figsize=(16, 9))
     sr = 44100
-    bergunde, _ = sf.read("audio/acoustic_guitar.mp3")
-    tap, _ = sf.read("audio/tap.wav")
+    #bergunde, _ = sf.read("audio/acoustic_guitar.mp3")
+    #tap, _ = sf.read("audio/tap.wav")
     #berg = bergunde[:2*sr]
     #berg = bergunde
     #berg = np.array([berg, berg]).T

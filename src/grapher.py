@@ -1,7 +1,11 @@
 import bisect
+import json
+import os
 from PySide6 import QtCore
 from PySide6.QtCore import QUrl, QSize
-from PySide6.QtWidgets import (QApplication, QDial, QGridLayout, QHBoxLayout, QMainWindow, QPushButton, QToolBar, QWidget)
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (QApplication, QDial, QFileDialog, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QToolBar, QWidget)
+import waveform
 
 import pyqtgraph as pg
 
@@ -13,10 +17,37 @@ class MainWindow(QMainWindow):
         toolBar = QToolBar()
         self.addToolBar(toolBar)
         fileMenu = self.menuBar().addMenu("&File")
+        self.populateFileMenu(fileMenu)
         editMenu = self.menuBar().addMenu("&Edit")
         viewMenu = self.menuBar().addMenu("&View")
         self.graphWidget = GraphWidget()
         self.setCentralWidget(self.graphWidget)
+    def populateFileMenu(self, fileMenu):
+        """
+        File menu functions:
+        * Save
+        * Open
+        """
+        saveWaveAction = QAction("&Save Waveform", self, shortcut="Ctrl+S", triggered=self.saveWaveformTrigger)
+        fileMenu.addAction(saveWaveAction)
+
+    def saveWaveformTrigger(self):
+        """
+        Open a QFileDialog to save the waveform
+        """
+        filePath, fileType = QFileDialog.getSaveFileName(
+            self
+            , "Open a File:"
+            , os.getcwd()
+            , "JSON Files (*.json);;"
+        )
+        if not filePath.lower().endswith(".json"):
+            filePath = filePath + ".json"
+        x, y = self.graphWidget.getPoints()
+        with open(filePath, "w") as f:
+            json.dump({"x": x, "y": y}, f)
+
+
 
 class GraphWidget(QWidget):
     def __init__(self):
@@ -41,14 +72,23 @@ class GraphWidget(QWidget):
         self.mouseClickedProxy = pg.SignalProxy(self.graph.scene().sigMouseClicked, rateLimit=60, slot=self.addPoint)
 
         self.graph.showGrid(True, True, .5)
+        self.plotPen = pg.mkPen("#0099bb", width=2)
         self.graphButtonWidget = QWidget()
         self.buttonLayout = QHBoxLayout(self.graphButtonWidget)
         self.playButton = QPushButton("Play")
         self.clearButton = QPushButton("Clear")
+        self.clearButton.setMinimumSize(QSize(30, 30))
+        self.clearButton.setMaximumSize(QSize(100, 100))
+        self.clearButton.clicked.connect(self.clearGraphAndPoints)
         self.playButton.setMinimumSize(QSize(30, 30))
         self.playButton.setMaximumSize(QSize(100, 100))
+        self.playButton.clicked.connect(self.playWaveform)
+        self.interpolateButton = QPushButton("Interp")
+        self.interpolateButton.setMinimumSize(QSize(30, 30))
+        self.interpolateButton.setMaximumSize(QSize(100, 100))
         self.durationDial = QDial()
         self.buttonLayout.addWidget(self.playButton)
+        self.buttonLayout.addWidget(self.clearButton)
         #self.buttonLayout.addWidget(self.durationDial)
         self.gridLayout.addWidget(self.window, 0, 0)
         self.gridLayout.addWidget(self.graphButtonWidget, 1, 0)
@@ -61,6 +101,9 @@ class GraphWidget(QWidget):
             bisect.insort(self.points, [plotPosition.x(), plotPosition.y()], key=lambda t: t[0])
             self.graphPoints(self.points)
 
+    def clearGraphAndPoints(self):
+        self.points = []
+        self.clearGraph()
 
     def clearGraph(self):
         self.graph.clear()
@@ -70,8 +113,21 @@ class GraphWidget(QWidget):
 
     def graphPoints(self, points):
         self.clearGraph()
-        self.graph.plot(*zip(*points))
-        
+        self.graph.plot(*zip(*points), pen=self.plotPen)
+
+    def playWaveform(self):
+        if len(self.points) < 2:
+            return
+        frequency = self.getFrequency()
+
+    def getFrequency(self):
+        """
+        TODO: Get the frequency
+        """
+        return 440
+
+    def getPoints(self):
+        return list(zip(*self.points))
 
     def mouseMoved(self, event):
         pos = event[0]
