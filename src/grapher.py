@@ -9,7 +9,7 @@ import os
 from PySide6 import QtCore
 from PySide6.QtCore import QUrl, QSize, QTimer
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox, QDial, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QSpinBox, QToolBar, QWidget)
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox, QDial, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSizePolicy, QToolBar, QWidget)
 import waveform
 
 import pyqtgraph as pg
@@ -34,7 +34,9 @@ class MainWindow(QMainWindow):
         * Open
         """
         saveWaveAction = QAction("&Save Waveform", self, shortcut="Ctrl+S", triggered=self.saveWaveformTrigger)
+        loadWaveAction = QAction("&Load Waveform", self, shortcut="Ctrl+O", triggered=self.loadWaveformTrigger)
         fileMenu.addAction(saveWaveAction)
+        fileMenu.addAction(loadWaveAction)
 
     def saveWaveformTrigger(self):
         """
@@ -42,7 +44,7 @@ class MainWindow(QMainWindow):
         """
         filePath, fileType = QFileDialog.getSaveFileName(
             self
-            , "Open a File:"
+            , "Save a File:"
             , os.getcwd()
             , "JSON Files (*.json);;"
         )
@@ -52,6 +54,21 @@ class MainWindow(QMainWindow):
         with open(filePath, "w") as f:
             json.dump({"x": x, "y": y}, f)
 
+    def loadWaveformTrigger(self):
+        points = self.graphWidget.getPoints()
+        if len(points) > 2:
+            self.saveWaveformTrigger()
+        filePath, fileType = QFileDialog.getOpenFileName(
+            self
+            , "Open a file:"
+            , os.getcwd()
+            , "JSON Files (*.json);;"
+        )
+        with open(filePath, "r") as f:
+            data = json.load(f)
+            self.graphWidget.setPoints(list(zip(data['x'], data['y'])))
+            self.graphWidget.graphPoints()
+            
 
 
 class GraphWidget(QWidget):
@@ -125,7 +142,7 @@ class GraphWidget(QWidget):
         self.durationSpin.setValue(3)
         self.durationSpin.setMaximumSize(lowerWidgetMaximumSize)
 
-        self.sinePlotCheckBox = QCheckBox("Plot Sine")
+        self.sinePlotCheckBox = QCheckBox("Sine Interpolated")
         self.sinePlotCheckBox.setMaximumSize(lowerWidgetMaximumSize)
         self.sinePlotCheckBox.setCheckState(QtCore.Qt.CheckState.Checked)
         self.sinePlotCheckBox.checkStateChanged.connect(self.graphPoints)
@@ -136,11 +153,15 @@ class GraphWidget(QWidget):
         self.buttonLayout.addWidget(self.sinePlotCheckBox)
         self.buttonLayout.addWidget(self.frequencySpin)
         self.buttonLayout.addWidget(self.durationSpin)
-        self.buttonLayout.setSpacing(1)
-        self.buttonLayout.setContentsMargins(0, 1, 0, 0)
+        self.buttonLayout.setSpacing(10)
+        # Left top right bottom
+        self.buttonLayout.setContentsMargins(0, 0, 0, 20)
+        # Needed to reduce spacing between widgets
+        self.buttonLayout.addStretch()
 
-        self.gridLayout.addWidget(self.window, 0, 0)
-        self.gridLayout.addWidget(self.graphButtonWidget, 1, 0)
+        self.gridLayout.addWidget(self.window, 0, 1)
+        self.gridLayout.addWidget(self.graphButtonWidget, 1, 1)
+        self.gridLayout.setSpacing(4)
 
 
     def adjustFrequency(self, event):
@@ -248,6 +269,9 @@ class GraphWidget(QWidget):
 
     def getPoints(self):
         return list(zip(*self.points))
+
+    def setPoints(self, points):
+        self.points = points
 
     def mouseMoved(self, event):
         """
