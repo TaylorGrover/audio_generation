@@ -1,9 +1,13 @@
+"""
+Proof-of-concept for displaying simple hand-traced points; sine and linear interpolation;
+and audio playback of each form.
+"""
 import bisect
 import json
 import numpy as np
 import os
 from PySide6 import QtCore
-from PySide6.QtCore import QUrl, QSize
+from PySide6.QtCore import QUrl, QSize, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox, QDial, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QSpinBox, QToolBar, QWidget)
 import waveform
@@ -53,6 +57,8 @@ class MainWindow(QMainWindow):
 class GraphWidget(QWidget):
     def __init__(self):
         super().__init__()
+        self.isPlaying = False
+
         self.seed = np.array([])
         self.points = []
         self.lines = []
@@ -75,28 +81,37 @@ class GraphWidget(QWidget):
         self.mouseClickedProxy = pg.SignalProxy(self.graph.scene().sigMouseClicked, rateLimit=60, slot=self.addPoint)
 
         self.graph.showGrid(True, True, .5)
+
         self.plotPen = pg.mkPen("#0099bb", width=2)
-        self.interpolatedPen = pg.mkPen("#ff0000", width=2)
+        self.sineInterpolatedPen = pg.mkPen("#ff0000", width=2)
+        self.linearInterpolatedPen = pg.mkPen("#ff00ff", width=2)
+
         self.scatterPen = pg.mkPen("#aa0000", width=2)
         self.graphButtonWidget = QWidget()
+
         self.buttonLayout = QHBoxLayout(self.graphButtonWidget)
+
         self.playButton = QPushButton("Play")
+        self.playButton.setMinimumSize(QSize(30, 30))
+        self.playButton.setMaximumSize(lowerWidgetMaximumSize)
+        self.playButton.clicked.connect(self.playWaveform)
+
         self.clearButton = QPushButton("Clear")
         self.clearButton.setMinimumSize(QSize(30, 30))
         self.clearButton.setMaximumSize(lowerWidgetMaximumSize)
         self.clearButton.clicked.connect(self.clearGraphAndPoints)
-        self.playButton.setMinimumSize(QSize(30, 30))
-        self.playButton.setMaximumSize(lowerWidgetMaximumSize)
-        self.playButton.clicked.connect(self.playWaveform)
+
         self.interpolateButton = QPushButton("Interp")
         self.interpolateButton.setMinimumSize(QSize(30, 30))
         self.interpolateButton.setMaximumSize(lowerWidgetMaximumSize)
+
         self.sineCountSpin = QSpinBox()
         self.sineCountSpin.setRange(1, 20)
         self.sineCountSpin.setValue(15)
         self.sineCountSpin.setMinimumSize(QSize(30, 30))
         self.sineCountSpin.setMaximumSize(lowerWidgetMaximumSize)
         self.sineCountSpin.valueChanged.connect(self.graphPoints)
+
         self.frequencySpin = QDoubleSpinBox()
         self.frequencySpin.setRange(30, 4000)
         self.frequencySpin.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
@@ -104,18 +119,26 @@ class GraphWidget(QWidget):
         self.frequencySpin.valueChanged.connect(self.adjustFrequency)
         self.frequencySpin.setValue(220 * 2 ** (-8/12))
         self.frequencySpin.setMaximumSize(lowerWidgetMaximumSize)
+
         self.durationSpin = QDoubleSpinBox()
         self.durationSpin.setRange(1, 10)
         self.durationSpin.setValue(3)
+        self.durationSpin.setMaximumSize(lowerWidgetMaximumSize)
+
         self.sinePlotCheckBox = QCheckBox("Plot Sine")
         self.sinePlotCheckBox.setMaximumSize(lowerWidgetMaximumSize)
         self.sinePlotCheckBox.setCheckState(QtCore.Qt.CheckState.Checked)
+        self.sinePlotCheckBox.checkStateChanged.connect(self.graphPoints)
+
         self.buttonLayout.addWidget(self.playButton)
         self.buttonLayout.addWidget(self.clearButton)
         self.buttonLayout.addWidget(self.sineCountSpin)
         self.buttonLayout.addWidget(self.sinePlotCheckBox)
         self.buttonLayout.addWidget(self.frequencySpin)
         self.buttonLayout.addWidget(self.durationSpin)
+        self.buttonLayout.setSpacing(1)
+        self.buttonLayout.setContentsMargins(0, 1, 0, 0)
+
         self.gridLayout.addWidget(self.window, 0, 0)
         self.gridLayout.addWidget(self.graphButtonWidget, 1, 0)
 
@@ -166,22 +189,27 @@ class GraphWidget(QWidget):
         x, y = zip(*self.points)
         self.graph.plot(x, y, pen=self.plotPen)
         self.graph.scatterPlot(x, y, pen=self.scatterPen)
+        new_x = np.linspace(x[0], x[-1], len(x))
+        self.seed = np.interp(new_x, x, y)
+        self.graph.scatterPlot(new_x, self.seed, pen=self.sineInterpolatedPen)
+        self.graph.plot(new_x, self.seed, pen=self.linearInterpolatedPen)
         if self.sinePlotCheckBox.isChecked():
             # Need to make evenly spaced xs 
-            new_x = np.linspace(x[0], x[-1], len(x))
-            self.seed = np.interp(new_x, x, y)
-            self.graph.scatterPlot(new_x, self.seed, pen=self.interpolatedPen)
             if len(new_x) >= 2:
                 duration = new_x[-1] - new_x[0]
                 amplitude = np.max(np.abs(self.seed))
                 sine_count = self.sineCountSpin.value()
                 t = np.linspace(new_x[0], new_x[-1], int(duration * waveform.SAMPLE_RATE))
                 wave = waveform.seeded_waveform(amplitude, duration, 1 / duration, self.seed, waveform.SAMPLE_RATE, sine_count)
-                self.graph.plot(t, wave.T[0], pen=self.interpolatedPen)
+                self.graph.plot(t, wave.T[0], pen=self.sineInterpolatedPen)
 
     def playWaveform(self):
         if len(self.points) < 2:
             return
+        if self.isPlaying:
+            self.effect.stop()
+            self.resetPlayButton()
+            return 
         frequency = self.getFrequency()
         duration = self.getDuration()
         if self.sinePlotCheckBox.isChecked():
@@ -202,6 +230,15 @@ class GraphWidget(QWidget):
 
         self.effect = waveform.play(self.wave)
         self.effect.play()
+        self.playTimer = QTimer()
+        self.playTimer.timeout.connect(self.resetPlayButton)
+        self.playTimer.start(int(duration * 1000))
+        self.playButton.setText("Stop")
+        self.isPlaying = True
+
+    def resetPlayButton(self):
+        self.playButton.setText("Play")
+        self.isPlaying = False
 
     def getFrequency(self):
         return self.frequencySpin.value()
@@ -213,6 +250,9 @@ class GraphWidget(QWidget):
         return list(zip(*self.points))
 
     def mouseMoved(self, event):
+        """
+        Draw vertical and horizontal lines at the cursor position
+        """
         pos = event[0]
         if self.graph.sceneBoundingRect().contains(pos):
             mousePoint = self.graph.vb.mapSceneToView(pos)
