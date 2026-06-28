@@ -22,8 +22,11 @@ F = 43.653528929125486
 
 SAMPLE_RATE = 44100
 
+NOTE_LETTERS = ["F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#", "E"]
+NOTE_FREQUENCY_MAP = dict(zip(NOTE_LETTERS, [F * 2 ** (i / 12) for i in range(len(NOTE_LETTERS))]))
+
 def _build_note_map():
-    note_letters = ["F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#", "E"]
+    note_letters = NOTE_LETTERS
     base_indices = list(map(lambda index: (index + 1) * 100, range(0, len(note_letters))))
     note_map = {}
     for i in range(7):
@@ -675,7 +678,6 @@ def play(waveform, loop=False, sr=44100):
     url = QUrl.fromLocalFile(path)
     effect = QSoundEffect()
     effect.setSource(url)
-    print(QSoundEffect.Loop.Infinite.value)
     if loop:
         effect.setLoopCount(QSoundEffect.Loop.Infinite.value)
     else:

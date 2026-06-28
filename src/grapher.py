@@ -7,9 +7,9 @@ import json
 import numpy as np
 import os
 from PySide6 import QtCore
-from PySide6.QtCore import QUrl, QSize, QTimer
+from PySide6.QtCore import QUrl, QSize, QTimer, Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox, QDial, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSizePolicy, QToolBar, QWidget)
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSizePolicy, QSlider, QToolBar, QWidget)
 import waveform
 
 import pyqtgraph as pg
@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
         viewMenu = self.menuBar().addMenu("&View")
         self.graphWidget = GraphWidget()
         self.setCentralWidget(self.graphWidget)
+
     def populateFileMenu(self, fileMenu):
         """
         File menu functions:
@@ -70,6 +71,42 @@ class MainWindow(QMainWindow):
             self.graphWidget.graphPoints()
             
 
+class VolumeControlsWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.layout = QHBoxLayout(self)
+        self.volumeSlider = QSlider()
+        self.volumeSlider.setMaximumSize(QSize(100, 100))
+        self.volumeSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.volumeSlider.setRange(0, 10)
+        self.volumeSlider.setValue(10)
+        self.volumeSlider.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.layout.addWidget(self.volumeSlider)
+
+    def getVolume(self):
+        return self.volumeSlider.value() / 10.0
+
+class SineInterpolatorWidget(QWidget):
+    changedSignal = Signal(int)
+
+    def __init__(self):
+        super().__init__()
+        self.sinePlotCheckBox = QCheckBox("Sine Interpolated")
+        self.sinePlotCheckBox.setMaximumSize(lowerWidgetMaximumSize)
+        self.sinePlotCheckBox.setCheckState(QtCore.Qt.CheckState.Checked)
+        self.sinePlotCheckBox.checkStateChanged.connect(self.stateChanged)
+
+    def stateChanged(self, event):
+        self.changedSignal.emit()
+        
+
+        
+
+class WaveformConfigurationGroupWidget(QWidget):
+    """
+    """
+    def __init__(self):
+        super().__init__()
 
 class GraphWidget(QWidget):
     def __init__(self):
@@ -106,7 +143,8 @@ class GraphWidget(QWidget):
         self.scatterPen = pg.mkPen("#aa0000", width=2)
         self.graphButtonWidget = QWidget()
 
-        self.buttonLayout = QHBoxLayout(self.graphButtonWidget)
+        #self.lowerButtonLayout = QHBoxLayout(self.graphButtonWidget)
+        self.controlLayout = QFormLayout(self.graphButtonWidget)
 
         self.playButton = QPushButton("Play")
         self.playButton.setMinimumSize(QSize(30, 30))
@@ -118,24 +156,28 @@ class GraphWidget(QWidget):
         self.clearButton.setMaximumSize(lowerWidgetMaximumSize)
         self.clearButton.clicked.connect(self.clearGraphAndPoints)
 
-        self.interpolateButton = QPushButton("Interp")
-        self.interpolateButton.setMinimumSize(QSize(30, 30))
-        self.interpolateButton.setMaximumSize(lowerWidgetMaximumSize)
+        self.volumeSlider = VolumeControlsWidget()
 
         self.sineCountSpin = QSpinBox()
-        self.sineCountSpin.setRange(1, 20)
+        self.sineCountSpin.setRange(1, 100)
         self.sineCountSpin.setValue(15)
         self.sineCountSpin.setMinimumSize(QSize(30, 30))
         self.sineCountSpin.setMaximumSize(lowerWidgetMaximumSize)
         self.sineCountSpin.valueChanged.connect(self.graphPoints)
 
-        self.frequencySpin = QDoubleSpinBox()
-        self.frequencySpin.setRange(30, 4000)
-        self.frequencySpin.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
-        self.frequencySpin.setDecimals(8)
-        self.frequencySpin.valueChanged.connect(self.adjustFrequency)
-        self.frequencySpin.setValue(220 * 2 ** (-8/12))
-        self.frequencySpin.setMaximumSize(lowerWidgetMaximumSize)
+        self.frequencySelector = QComboBox()
+        self.frequencySelector.addItems(waveform.NOTE_LETTERS)
+        self.frequencySelector.setMaximumSize(lowerWidgetMaximumSize)
+
+        self.centsSlider = QSlider()
+        self.centsSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.centsSlider.setMaximumSize(QSize(200, 100))
+        self.centsSlider.setRange(-100, 100)
+        self.centsSlider.setValue(0)
+
+        self.octaveSpin = QSpinBox()
+        self.octaveSpin.setRange(1, 7)
+        self.octaveSpin.setValue(4)
 
         self.durationSpin = QDoubleSpinBox()
         self.durationSpin.setRange(1, 10)
@@ -147,20 +189,33 @@ class GraphWidget(QWidget):
         self.sinePlotCheckBox.setCheckState(QtCore.Qt.CheckState.Checked)
         self.sinePlotCheckBox.checkStateChanged.connect(self.graphPoints)
 
-        self.buttonLayout.addWidget(self.playButton)
-        self.buttonLayout.addWidget(self.clearButton)
-        self.buttonLayout.addWidget(self.sineCountSpin)
-        self.buttonLayout.addWidget(self.sinePlotCheckBox)
-        self.buttonLayout.addWidget(self.frequencySpin)
-        self.buttonLayout.addWidget(self.durationSpin)
-        self.buttonLayout.setSpacing(10)
+        """
+        self.lowerButtonLayout.addWidget(self.playButton)
+        self.lowerButtonLayout.addWidget(self.clearButton)
+        self.lowerButtonLayout.addWidget(self.volumeSlider)
+        self.lowerButtonLayout.addWidget(self.sineCountSpin)
+        self.lowerButtonLayout.addWidget(self.sinePlotCheckBox)
+        self.lowerButtonLayout.addWidget(self.octaveSpin)
+        self.lowerButtonLayout.addWidget(self.frequencySelector)
+        self.lowerButtonLayout.addWidget(self.centsSlider)
+        self.lowerButtonLayout.addWidget(self.durationSpin)
+        self.lowerButtonLayout.setSpacing(10)
+        """
+
         # Left top right bottom
-        self.buttonLayout.setContentsMargins(0, 0, 0, 20)
+        #self.lowerButtonLayout.setContentsMargins(0, 0, 0, 20)
         # Needed to reduce spacing between widgets
-        self.buttonLayout.addStretch()
+        #self.lowerButtonLayout.addStretch()
+
+        self.controlLayout.addRow("Volume:", self.volumeSlider)
+        #self.controlLayout.addRow("Sine Interp:", self.sine
+        self.controlLayout.addRow("", self.playButton)
+        self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        self.controlLayout.setSpacing(4)
+        self.controlLayout.setContentsMargins(0, 0, 0, 0)
 
         self.gridLayout.addWidget(self.window, 0, 1)
-        self.gridLayout.addWidget(self.graphButtonWidget, 1, 1)
+        self.gridLayout.addWidget(self.graphButtonWidget, 0, 0)
         self.gridLayout.setSpacing(4)
 
 
@@ -225,17 +280,18 @@ class GraphWidget(QWidget):
                 self.graph.plot(t, wave.T[0], pen=self.sineInterpolatedPen)
 
     def playWaveform(self):
-        if len(self.points) < 2:
-            return
         if self.isPlaying:
             self.effect.stop()
             self.resetPlayButton()
             return 
+        if len(self.points) < 2:
+            return
         frequency = self.getFrequency()
         duration = self.getDuration()
+        volume = self.getVolume()
         if self.sinePlotCheckBox.isChecked():
             sine_count = self.sineCountSpin.value()
-            self.wave = waveform.seeded_waveform(1, duration, frequency, self.seed, waveform.SAMPLE_RATE, sine_count)
+            self.wave = volume * waveform.seeded_waveform(1, duration, frequency, self.seed, waveform.SAMPLE_RATE, sine_count)
         else:
             x, y = zip(*self.points)
             x = np.array(x)
@@ -247,7 +303,7 @@ class GraphWidget(QWidget):
             t_modulo = t_indices % wavelength_sample_count
             y_interp = np.interp(t_base, x, y)
             y_interp /= np.max(np.abs(y_interp), axis=0)
-            self.wave = y_interp[t_modulo]
+            self.wave = volume * y_interp[t_modulo]
 
         self.effect = waveform.play(self.wave)
         self.effect.play()
@@ -261,8 +317,13 @@ class GraphWidget(QWidget):
         self.playButton.setText("Play")
         self.isPlaying = False
 
+    def getVolume(self):
+        return self.volumeSlider.getVolume()
+
     def getFrequency(self):
-        return self.frequencySpin.value()
+        sliderValue = self.centsSlider.value()
+        octave = self.octaveSpin.value()
+        return waveform.NOTE_FREQUENCY_MAP[self.frequencySelector.currentText()] * 2 ** (sliderValue / 1200) * 2 ** (octave - 1)
 
     def getDuration(self):
         return self.durationSpin.value()

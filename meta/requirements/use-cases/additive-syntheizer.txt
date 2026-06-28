@@ -1,1 +1,41 @@
-I want an additive synthesize
+Additive Synthesizer Requirements
+* Hand-trace sine-interpolated waveforms
+* Snap-in/out traced waveforms at different frequencies with time-varying
+  amplitude and frequency envelopes
+* Maintain a global frequency and amplitude envelope
+
+* Maintain a catalog of easily accessible and memorable waveforms for
+  oscillator and envelope functions. 
+  - Any specified waveform should be usable as either an oscillator or envelope.
+  - Envelopes for different functions (oscillation, AM/FM, etc.) should be
+	distinguished in the main view. I.e., each waveform present in the
+	synthesis should be readily visible with an obvious specified function.
+
+* Keep a record of user actions per session to allow undo operations
+* Save session state to re-open later
+
+
+Further Requirements:
+
+The software should be able to toggle between individual waveform editors and
+a global synthesis view. Waveforms can be edited by selecting them from a
+catalog of waveforms identified by labeled images. Each image will be a small
+icon capture of the waveform since the last saved edit. Waveforms will belong
+to individual Projects, but can readily imported to other projects. This
+should help maintain better organization in the synthesis workspace. The
+global synthesis view will display a list of the currently combined waveforms,
+their fundamental frequencies, and their associated frequency/amplitude
+envelopes. The central widget will be graph of the combined waveforms with all
+envelopes applied. For now, the list of waveform components should display
+three colors of waveforms: one for each of the oscillator, amplitude envelope,
+and frequency envelope (if present). 
+
+Envelope Behaviors
+
+Amplitude envelopes applied to oscillators should either scale in size with
+specified note duration, or use a more classical ADSR approach that scales
+only the sustain portion. I.e., the attack, decay, and release components have
+fixed lengths that always followed regardless of note length. In the case of
+contiguous and non-overlapping notes, the release portion of one note may
+trail into the attack stage of the next note. These details can be considered
+further when actually sequencing notes.
