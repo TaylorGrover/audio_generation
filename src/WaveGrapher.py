@@ -8,15 +8,18 @@ import numpy as np
 import os
 from PySide6 import QtCore
 from PySide6.QtCore import QUrl, QSize, QTimer, Signal
-from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSizePolicy, QSlider, QToolBar, QWidget)
+from PySide6.QtGui import QAction, QImage
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, QFrame, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSizePolicy, QSlider, QToolBar, QVBoxLayout, QWidget)
 import waveform
 
 import pyqtgraph as pg
 
-import sys
+class WaveView(QMainWindow):
+    undoSignal = Signal(int)
+    redoSignal = Signal(int)
 
-class MainWindow(QMainWindow):
+    catalogAdditionSignal = Signal(int)
+
     def __init__(self):
         super().__init__()
         toolBar = QToolBar()
@@ -24,9 +27,15 @@ class MainWindow(QMainWindow):
         fileMenu = self.menuBar().addMenu("&File")
         self.populateFileMenu(fileMenu)
         editMenu = self.menuBar().addMenu("&Edit")
+        self.populateEditMenu(editMenu)
         viewMenu = self.menuBar().addMenu("&View")
-        self.graphWidget = GraphWidget()
-        self.setCentralWidget(self.graphWidget)
+        self.workspaceWidget = WorkspaceWidget()
+        self.setCentralWidget(self.workspaceWidget)
+
+        self.workspaceWidget.catalogAdditionSignal.connect(self.emitCatalogWaveAdded)
+    
+    def emitCatalogWaveAdded(self, event):
+        self.catalogAdditionSignal.emit(event)
 
     def populateFileMenu(self, fileMenu):
         """
@@ -38,6 +47,30 @@ class MainWindow(QMainWindow):
         loadWaveAction = QAction("&Load Waveform", self, shortcut="Ctrl+O", triggered=self.loadWaveformTrigger)
         fileMenu.addAction(saveWaveAction)
         fileMenu.addAction(loadWaveAction)
+
+    def populateEditMenu(self, editMenu):
+        """
+        File menu functions:
+        * Undo
+        * Redo
+        """
+        undoAction = QAction("&Undo", self, shortcut="Ctrl+Z", triggered=self.emitUndoSignal)
+        redoAction = QAction("&Redo", self, shortcut="Ctrl+Y", triggered=self.emitRedoSignal)
+        editMenu.addAction(undoAction)
+        editMenu.addAction(redoAction)
+
+    def populateViewMenu(self, viewMenu):
+        """
+        TODO
+        """
+
+    def emitUndoSignal(self):
+        """
+        """
+        self.undoSignal.emit()
+
+    def emitRedoSignal(self):
+        self.redoSignal.emit()
 
     def saveWaveformTrigger(self):
         """
@@ -137,7 +170,7 @@ class FrequencyWidget(QWidget):
 
         self.octaveSpin = QSpinBox()
         self.octaveSpin.setRange(1, 7)
-        self.octaveSpin.setValue(2)
+        self.octaveSpin.setValue(1)
         self.octaveSpin.setMaximumSize(QSize(100, 100))
 
         self.formLayout.addRow("Note:", self.frequencySelector)
@@ -155,14 +188,69 @@ class FrequencyWidget(QWidget):
         octave = self.octaveSpin.value()
         return waveform.NOTE_FREQUENCY_MAP[self.frequencySelector.currentText()] * 2 ** (cents / 1200) * 2 ** (octave - 1)
 
+
+class LabeledWaveImageWidget(QFrame):
+    def __init__(self, name: str):
+        super().__init__()
+        self.vboxLayout = QVBoxLayout(self)
+        self.label = QLabel(name)
+        self.image = QImage()
+        self.vboxLayout.addWidget(self.label)
+        #self.setStyleSheet("border: 1px solid blue")
+        #self.vboxLayout.addWidget(self.image)
+
+
+class WorkspaceWidget(QWidget):
+    catalogAdditionSignal = Signal(int)
+
+    def __init__(self):
+        super().__init__()
+        self.gridLayout = QGridLayout(self)
+        self.graphWidget = GraphWidget()
+        self.catalogWidget = WaveformCatalogWidget()
+        self.gridLayout.addWidget(self.catalogWidget, 0, 0)
+        self.gridLayout.addWidget(self.graphWidget, 0, 1)
+
+        # Signal management
+        self.catalogWidget.catalogAdditionSignal.connect(self.emitCatalogWaveAdded)
+
+    def emitCatalogWaveAdded(self, event):
+        self.catalogAdditionSignal.emit(event)
+
+
+class WaveformCatalogWidget(QWidget):
+    """
+    """
+    catalogAdditionSignal = Signal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self.vboxLayout = QVBoxLayout(self)
+        self.vboxLayout.setSpacing(0)
+        self.labeledWavesList = []
+        self.catalogSection = QWidget()
+        self.catalogVBox = QVBoxLayout(self.catalogSection)
+        self.addWaveButton = QPushButton("+")
+        self.addWaveButton.setMaximumSize(QSize(100, 100))
+        self.addWaveButton.clicked.connect(self.emitCatalogWaveAdded)
+        self.vboxLayout.addWidget(self.catalogSection)
+        self.vboxLayout.addWidget(self.addWaveButton)
+        self.vboxLayout.addStretch()
+
+    def emitCatalogWaveAdded(self, event):
+        self.catalogAdditionSignal.emit(event)
+
+
+
 class GraphWidget(QWidget):
+    catalogAdditionSignal = Signal(int)
+
     def __init__(self):
         super().__init__()
         self.isPlaying = False
 
         self.seed = np.array([])
         self.points = []
-        self.lines = []
         self.gridLayout = QGridLayout(self)
         lowerWidgetMaximumSize = QSize(100, 100)
         self.window = pg.GraphicsLayoutWidget()
@@ -179,7 +267,7 @@ class GraphWidget(QWidget):
         self.graph.setLimits(xMin=0, xMax=1, yMin=-1, yMax=1)
 
         # Connect to self.addPoint
-        self.mouseClickedProxy = pg.SignalProxy(self.graph.scene().sigMouseClicked, rateLimit=60, slot=self.addPoint)
+        self.mouseClickedProxy = pg.SignalProxy(self.graph.scene().sigMouseClicked, rateLimit=1, slot=self.addPoint)
 
         self.graph.showGrid(True, True, .5)
 
@@ -227,6 +315,7 @@ class GraphWidget(QWidget):
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
         self.controlLayout.addRow("Freq:", self.frequencyWidget)
         self.controlLayout.addRow("Duration:", self.durationSpin)
+        self.controlLayout.addRow("", self.clearButton)
         self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
         self.controlLayout.setSpacing(4)
         self.controlLayout.setContentsMargins(0, 0, 0, 0)
@@ -235,7 +324,6 @@ class GraphWidget(QWidget):
         self.gridLayout.addWidget(self.graphButtonWidget, 0, 0)
         self.gridLayout.setSpacing(0)
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
-
 
     def calculateSeed(self, points):
         """
@@ -274,18 +362,24 @@ class GraphWidget(QWidget):
         self.graph.addItem(self.horizontal)
 
 
+    def plot(self, x, y, pen=None):
+        self.graph.plot(x, y, pen=pen)
+
+    def scatterPlot(self, x, y, pen=None):
+        self.graph.scatterPlot(x, y, pen=pen)
+
     def graphPoints(self):
         self.clearGraph()
         x, y = zip(*self.points)
         self.graph.plot(x, y, pen=self.plotPen)
         self.graph.scatterPlot(x, y, pen=self.scatterPen)
-        new_x = np.linspace(x[0], x[-1], len(x))
+        new_x = np.linspace(x[0], x[-1], 2 * len(x))
         self.seed = np.interp(new_x, x, y)
         self.graph.scatterPlot(new_x, self.seed, pen=self.sineInterpolatedPen)
         self.graph.plot(new_x, self.seed, pen=self.linearInterpolatedPen)
         if self.sineInterpolatorWidget.isChecked():
             # Need to make evenly spaced xs 
-            if len(new_x) >= 2:
+            if len(x) >= 2:
                 duration = new_x[-1] - new_x[0]
                 amplitude = np.max(np.abs(self.seed))
                 sine_count = self.sineInterpolatorWidget.sineCount()
@@ -364,15 +458,3 @@ class GraphWidget(QWidget):
     def clear(self):
         self.graph.clear()
 
-
-def start_gui():
-    app = QApplication(sys.argv)
-    mainWindow = MainWindow()
-    mainWindow.setWindowTitle("Grapher Utility")
-    availableGeometry = mainWindow.screen().availableGeometry()
-    mainWindow.resize(availableGeometry.width(), availableGeometry.height())
-    mainWindow.show()
-    sys.exit(app.exec())
-
-if __name__ == "__main__":
-    start_gui()
