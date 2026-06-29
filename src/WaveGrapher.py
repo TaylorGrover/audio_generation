@@ -267,7 +267,7 @@ class GraphWidget(QWidget):
         self.graph.setLimits(xMin=0, xMax=1, yMin=-1, yMax=1)
 
         # Connect to self.addPoint
-        self.mouseClickedProxy = pg.SignalProxy(self.graph.scene().sigMouseClicked, rateLimit=1, slot=self.addPoint)
+        self.mouseClickedProxy = pg.SignalProxy(self.graph.scene().sigMouseClicked, rateLimit=120, slot=self.addPoint)
 
         self.graph.showGrid(True, True, .5)
 
