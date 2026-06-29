@@ -75,6 +75,8 @@ class WaveView(QMainWindow):
     def saveWaveformTrigger(self):
         """
         Open a QFileDialog to save the waveform
+        TODO: Fix these saving and loading functions.
+        TODO: These need to save the project in its entirety rather than just a single waveform.
         """
         filePath, fileType = QFileDialog.getSaveFileName(
             self
@@ -133,7 +135,7 @@ class SineInterpolatorWidget(QWidget):
 
         self.sineCountSpin = QSpinBox()
         self.sineCountSpin.setRange(1, 50)
-        self.sineCountSpin.setValue(15)
+        self.sineCountSpin.setValue(13)
         self.sineCountSpin.setMinimumSize(QSize(30, 30))
         self.sineCountSpin.setMaximumSize(QSize(100, 100))
         self.sineCountSpin.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -206,7 +208,7 @@ class WorkspaceWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.gridLayout = QGridLayout(self)
-        self.graphWidget = GraphWidget()
+        self.graphWidget = ComponentGraphWidget()
         self.catalogWidget = WaveformCatalogWidget()
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
         self.gridLayout.addWidget(self.graphWidget, 0, 1)
@@ -240,9 +242,12 @@ class WaveformCatalogWidget(QWidget):
     def emitCatalogWaveAdded(self, event):
         self.catalogAdditionSignal.emit(event)
 
+class CentralGraphWidget(QWidget):
+    def __init__(self):
 
+        pass
 
-class GraphWidget(QWidget):
+class ComponentGraphWidget(QWidget):
     catalogAdditionSignal = Signal(int)
 
     def __init__(self):
@@ -278,7 +283,6 @@ class GraphWidget(QWidget):
         self.scatterPen = pg.mkPen("#aa0000", width=2)
         self.graphButtonWidget = QWidget()
 
-        #self.lowerButtonLayout = QHBoxLayout(self.graphButtonWidget)
         self.controlLayout = QFormLayout(self.graphButtonWidget)
         self.graphButtonWidget.setMaximumSize(QSize(300, 5000))
 

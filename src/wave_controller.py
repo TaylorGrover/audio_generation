@@ -14,7 +14,9 @@ class WaveController:
         """
         self.view = view 
 
-        # Add wave button clicked: Register graph button signals
+        ##### SIGNALS #####
+
+        # Add-wave-to-catalog
         self.view.catalogAdditionSignal.connect(self.addWaveToCatalog)
         
         # Button shortcuts
@@ -24,7 +26,6 @@ class WaveController:
         """
         Add a wave graph to the catalogSection vbox
         """
-        
         print("Connected: ", event)
 
     
