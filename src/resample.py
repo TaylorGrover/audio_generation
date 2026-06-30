@@ -24,14 +24,16 @@ D = A * 2 ** (5/12)
 E = A * 2 ** (7/12)
 freq_kernel = [A, D, E]
 drifts = waveform.generate_frequency_drift(freq_kernel, .3, 3)
-t, s, wave = waveform.combine_random_smoothed(1, 3, drifts, waveform.SAMPLE_RATE, n=17, M=13)
+#t, s, wave = waveform.combine_random_smoothed(1, 3, drifts, waveform.SAMPLE_RATE, n=17, M=13)
 #ef = waveform.play(wave)
+#wave = wave[:, 0]
+wave, sr = sf.read("audio/acoustic_guitar.mp3")
 wave = wave[:, 0]
 
 sf.write("huh.wav", wave, waveform.SAMPLE_RATE)
 
 
-new_sample_rate = 2 ** (-1/12) * waveform.SAMPLE_RATE
+new_sample_rate = 2 ** (2/12) * waveform.SAMPLE_RATE
 new_sample_count = int(new_sample_rate * 3)
 new_sample_index = 0
 sample_delta = waveform.SAMPLE_RATE / new_sample_rate
