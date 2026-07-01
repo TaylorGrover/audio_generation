@@ -53,6 +53,40 @@ def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
     wave = vol * wave / np.max(np.abs(wave))
     return vol * np.array([wave, wave]).T
 
+def resample(wave, cents:int, poly_length:int=4, sr:int=44100):
+    new_sample_rate = 2 ** (-cents / 1200) * sr
+    sample_delta = sr / new_sample_rate
+    print("sample delta: {}".format(sample_delta))
+    n = len(wave)
+    print("old sample count: {}".format(n))
+    new_sample_count = int(n / sample_delta)
+    print('new sample count: {}'.format(new_sample_count))
+    new_sample_index = 0
+    resampled = []
+    interp_x = np.array([i for i in range(poly_length)])
+    window_start = 0
+    window_len = poly_length
+    y = wave[window_start:window_start+window_len]
+    weights = np.polyfit(interp_x, y, 3)
+    while new_sample_index < new_sample_count:
+        if new_sample_index >= window_start + window_len:
+            window_start += window_len
+            y = wave[window_start:window_start+window_len]
+            if len(y) < len(interp_x):
+                if len(y) < 2:
+                    break
+                print("y len: {}".format(len(y)))
+                print("x len: {}".format(len(interp_x)))
+                print("Current new sample count: {}".format(new_sample_index))
+                # Edge case for end of signal
+                interp_x = np.array([i for i in range(len(y))])
+            weights = np.polyfit(interp_x, y, 3)
+        x = new_sample_index - window_start
+        resampled.append(np.polyval(weights, x))
+        new_sample_index += sample_delta
+    new_wave = np.array(resampled)
+    return new_wave
+
 def random_smoothed_test(vol, duration, hz, sr, shift=0, n=15, M=13):
     assert duration > 0, "Duration must be greater than 0"
     wavelengths = 1.0 / hz
