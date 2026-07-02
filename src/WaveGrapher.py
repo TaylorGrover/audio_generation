@@ -203,6 +203,9 @@ class LabeledWaveImageWidget(QFrame):
 
 
 class WorkspaceWidget(QWidget):
+    """
+    This is the main widget containing
+    """
     catalogAdditionSignal = Signal(int)
 
     def __init__(self):
@@ -249,6 +252,7 @@ class CentralGraphWidget(QWidget):
 
 class ComponentGraphWidget(QWidget):
     catalogAdditionSignal = Signal(int)
+    pointAdditionSignal = Signal(float, float)
 
     def __init__(self):
         super().__init__()

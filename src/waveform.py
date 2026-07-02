@@ -105,7 +105,6 @@ def hyperbolic_tangent_env(A: float, t_f:float, percent_A:float, duration:float,
         raise ValueError("t_f must be strictly greater than 0")
     if percent_A == A:
         raise ValueError(f"percent_A must be strictly less than 1")
-
     t = np.linspace(0, duration, int(duration * sr))
     # k: Hyperbolic tangent input scaling coefficient
     k = 1 / (2 * t_f) * np.log((1 + percent_A) / (1-percent_A))

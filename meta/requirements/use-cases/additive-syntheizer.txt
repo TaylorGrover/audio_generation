@@ -38,4 +38,4 @@ only the sustain portion. I.e., the attack, decay, and release components have
 fixed lengths that always followed regardless of note length. In the case of
 contiguous and non-overlapping notes, the release portion of one note may
 trail into the attack stage of the next note. These details can be considered
-further when actually sequencing notes.
+further when actually sequencing notes. 

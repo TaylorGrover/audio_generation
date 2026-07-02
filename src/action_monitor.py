@@ -8,11 +8,14 @@ class UserAction(ABC):
         """
         """
     @abstractmethod
+    def doAction(self):
+        pass
+    @abstractmethod
     def reverseAction(self):
         pass
 
 """
-TODO:
+TODO: Implement the following classes
 
 class AddPointAction(UserAction):
 
@@ -20,8 +23,11 @@ class MovePointAction(UserAction):
 
 class DeletePointAction(UserAction):
 
-class ClearWaveACtion(UserAction)
+class ClearWaveAction(UserAction)
 """
+class AddPointAction(UserAction):
+    def __init__(self):
+        super().__init__()
 
 class ActionMonitor:
     def __init__(self):

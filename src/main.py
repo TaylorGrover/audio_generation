@@ -11,8 +11,8 @@ if __name__ == "__main__":
     waveView.setWindowTitle("Graph Synthesis")
     availableGeometry = waveView.screen().availableGeometry()
     waveView.resize(availableGeometry.width(), availableGeometry.height())
+    waveController = WaveController(waveView)
     waveView.show()
 
-    waveController = WaveController(waveView)
 
     sys.exit(app.exec())
