@@ -87,6 +87,30 @@ def resample(wave, cents:int, poly_length:int=4, sr:int=44100):
     new_wave = np.array(resampled)
     return new_wave
 
+def sigmoid_env(A, t_i, y_i, t_f, y_f, duration, sr):
+    t = np.linspace(0, duration, int(sr * duration))
+    k = np.log((A / y_f - 1) / (A / y_i - 1)) / (t_i - t_f)
+    s = 1 / k * np.log(A / y_i - 1) + t_i
+    return A / (np.exp(-k * (t - s)) + 1)
+
+def hyperbolic_tangent_env(A: float, t_f:float, percent_A:float, duration:float, sr:int) -> np.ndarray:
+    """
+    A: hyperbolic tangent scaling factor
+    t_f: time value at which function become percent_A percent of A
+    percent_A: some percentage of A reached at a point in time. Strictly less than 1
+    duration: length of envelope
+    sr: sample rate of envelope
+    """
+    if t_f <= 0:
+        raise ValueError("t_f must be strictly greater than 0")
+    if percent_A == A:
+        raise ValueError(f"percent_A must be strictly less than 1")
+
+    t = np.linspace(0, duration, int(duration * sr))
+    # k: Hyperbolic tangent input scaling coefficient
+    k = 1 / (2 * t_f) * np.log((1 + percent_A) / (1-percent_A))
+    return A * np.tanh(k * t)
+
 def random_smoothed_test(vol, duration, hz, sr, shift=0, n=15, M=13):
     assert duration > 0, "Duration must be greater than 0"
     wavelengths = 1.0 / hz
@@ -481,7 +505,7 @@ def random_smoothed_with_bend_with_time(vol, tim, hz, sr, shift=0, n=13, M=17, m
     wavelength = 1.0 / hz
     seed = np.random.uniform(-1, 1, n)
     coefficients = sine_coefficients_of_points(seed, hz, sine_count=M)
-    wave = np.zeros_like(t)
+    wave = np.zeros_like(tim)
     bend_depths = np.random.uniform(0, max_bend, M)
     bend_osc = np.random.uniform(0, max_osc, M)
     for k in range(1, M + 1):
@@ -489,6 +513,23 @@ def random_smoothed_with_bend_with_time(vol, tim, hz, sr, shift=0, n=13, M=17, m
 
     wave /= np.max(np.abs(wave))
     return tim, seed, wave
+
+def random_smoothed_with_freq_env_with_time(vol, t, hz, freq_env, sr, n=13, M=15):
+    """
+    Assume the frequency envelope is unscaled
+    """
+    seed = np.random.uniform(-1, 1, n)
+    coefficients = sine_coefficients_of_points(seed, hz, sine_count=M)
+    wave = np.zeros_like(t)
+    for k in range(1, M + 1):
+        freq = k * hz
+        theta_prime = 2 * np.pi * freq * 2 ** (freq_env / 12)
+        theta = np.cumsum(theta_prime) / sr
+        wave += coefficients[k - 1] * np.sin(theta)
+    wave /= np.max(np.abs(wave))
+    return t, seed, wave
+
+    
 
 def random_smoothed_with_flutter(vol, duration, hz, sr, shift=0, n=13, M=17, max_flutter_freq=10):
     t = np.linspace(0, duration, int(duration * sr))
@@ -585,6 +626,21 @@ def combine_bendy_lr(vol, duration, freqs, sr, shift=0, n=13, M=15, max_bend=.3,
     print(compute_durations)
     print(np.mean(compute_durations))
     print(np.std(compute_durations))
+    return t, seeds, np.array([left, right]).T
+
+def combine_freq_env_lr(vol, duration, freqs, freq_env, sr, shift=0, n=13, M=15):
+    t = np.linspace(0, duration, int(sr * duration))
+    left = np.zeros(int(sr * duration))
+    right = np.zeros(int(sr * duration))
+    seeds = []
+    for freq in freqs:
+        t, s_l, w_l = random_smoothed_with_freq_env_with_time(vol, t, freq, freq_env, sr, n=n, M=M)
+        t, s_r, w_r = random_smoothed_with_freq_env_with_time(vol, t, freq, freq_env, sr, n=n, M=M)
+        seeds.extend([s_l, s_r])
+        left += w_l
+        right += w_r
+    left /= np.max(np.abs(left))
+    right /= np.max(np.abs(right))
     return t, seeds, np.array([left, right]).T
 
 def combine_bendy_fluttered_lr(vol, duration, freqs, sr, shift=0, n=13, M=15, max_bend=.3, max_osc=5, max_flutter_freq=10):
