@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import scipy.fft as fft
+from scipy.interpolate import CubicSpline
 import shutil
 import soundfile as sf
 import string
@@ -53,8 +54,17 @@ def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
     wave = vol * wave / np.max(np.abs(wave))
     return vol * np.array([wave, wave]).T
 
-def resample(wave, cents:int, poly_length:int=4, sr:int=44100):
+def resample(wave, cents:int, sr:int=44100):
+    """
+    """
     new_sample_rate = 2 ** (-cents / 1200) * sr
+    t = np.linspace(0, len(wave) / sr, len(wave))
+    new_t = np.linspace(0, len(wave) / sr, int(new_sample_rate * len(wave) / sr))
+    cs = CubicSpline(t, wave)
+    new_wave = cs(new_t)
+    return new_wave
+
+"""
     sample_delta = sr / new_sample_rate
     print("sample delta: {}".format(sample_delta))
     n = len(wave)
@@ -86,6 +96,7 @@ def resample(wave, cents:int, poly_length:int=4, sr:int=44100):
         new_sample_index += sample_delta
     new_wave = np.array(resampled)
     return new_wave
+"""
 
 def sigmoid_env(A, t_i, y_i, t_f, y_f, duration, sr):
     t = np.linspace(0, duration, int(sr * duration))
@@ -96,7 +107,7 @@ def sigmoid_env(A, t_i, y_i, t_f, y_f, duration, sr):
 def hyperbolic_tangent_env(A: float, t_f:float, percent_A:float, duration:float, sr:int) -> np.ndarray:
     """
     A: hyperbolic tangent scaling factor
-    t_f: time value at which function become percent_A percent of A
+    t_f: time value at which function becomes percent_A percent of A
     percent_A: some percentage of A reached at a point in time. Strictly less than 1
     duration: length of envelope
     sr: sample rate of envelope
@@ -109,6 +120,10 @@ def hyperbolic_tangent_env(A: float, t_f:float, percent_A:float, duration:float,
     # k: Hyperbolic tangent input scaling coefficient
     k = 1 / (2 * t_f) * np.log((1 + percent_A) / (1-percent_A))
     return A * np.tanh(k * t)
+
+def normal_dist_env(A, mean, std, duration, sr):
+    t = np.linspace(0, duration, int(duration * sr))
+    return A * np.exp(-(t - mean) ** 2 / (2 * std ** 2))
 
 def random_smoothed_test(vol, duration, hz, sr, shift=0, n=15, M=13):
     assert duration > 0, "Duration must be greater than 0"
@@ -148,7 +163,7 @@ def random_smoothed(vol, duration, hz, sr, shift=0, n=5, M=17):
         wave += coefficients[k - 1] * np.sin(alpha_k * t)
     #plt.plot(t, np.interp(t, np.linspace(0, 1.0/wavelength, len(s) - 1), s[:-1], period=1/wavelength))
     wave /= np.max(np.abs(wave))
-    wave = np.array([wave, wave]).T
+    wave = vol * np.array([wave, wave]).T
     return t, s, wave 
 
 
@@ -675,6 +690,22 @@ def combine_random_smoothed_lr(vol, duration, freqs, sr, shift=0, n=17, M=15):
     left /= np.max(np.abs(left))
     right /= np.max(np.abs(right))
     return t, seeds, np.array([left, right]).T
+
+def combine_random_smoothed_lr_weights(vol, duration, freqs, amps, sr, shift=0, n=17, M=15):
+    if len(freqs) != len(amps):
+        raise ValueError("Need to specify an amplitude for each frequency")
+    left = np.zeros((int(sr * duration)))
+    right = np.zeros((int(sr * duration)))
+    seeds = []
+    for (freq, amp) in zip(freqs, amps):
+        t, s_l, w_l = random_smoothed(amp, duration, freq, sr, shift=shift, n=n, M=M)
+        t, s_r, w_r = random_smoothed(amp, duration, freq, sr, shift=shift, n=n, M=M)
+        seeds.extend([s_l, s_r])
+        left += w_l[:, 0]
+        right += w_r[:, 0]
+    left /= np.max(np.abs(left))
+    right /= np.max(np.abs(right))
+    return t, seeds, vol * np.array([left, right]).T
 
 def combine_flutter(vol, duration, freqs, sr, shift=0, n=17, M=15, max_flutter_freq=10):
     left = np.zeros((int(sr * duration)))

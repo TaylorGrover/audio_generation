@@ -8,23 +8,36 @@ class WaveController:
 
     TODO: Build interface for each of the signals returned by the GUI
     """
-    def __init__(self, view):
+    
+    def __init__(self, view, model):
         """
         Handle signals from widgets
         """
+        self.currentKeyIndex = 1
+        self.keyIndexCounter = 1
         self.view = view 
+        self.model = model
 
         self.actionMonitor = ActionMonitor()
 
         ##### SIGNALS #####
 
+        # Graph the current toggled waveform
+        self.view.graphSignal.connect(self.graphComponentWaveform)
+
+        # Play the current toggled waveform
+        self.view.playSignal.connect(self.playCurrentWaveform)
+
         # Add a wave to the catalog
         # TODO: Finish implementing this
-        self.view.catalogAdditionSignal.connect(self.addWaveToCatalog)
+        self.view.initiateCatalogAdditionSignal.connect(self.openCatalogAdditionDialog)
+        self.view.createCatalogWaveSignal.connect(self.createCatalogWave)
+        
 
         # TODO: Delete a wave from the catalog
 
         # TODO: Add an interpolating point to a wave, referenced by index or name
+        self.view.pointAdditionSignal.connect(self.addPointToWave)
 
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
@@ -64,10 +77,32 @@ class WaveController:
         # Button shortcuts
         #self.actionMonitor = actionMonitor
     
-    def addWaveToCatalog(self, event):
+    def openCatalogAdditionDialog(self, event):
         """
         Add a wave graph to the catalogSection vbox
         """
-        print("Connected: ", event)
+        # Get next available key
+        self.view.openCatalogAdditionDialog(event)
 
-    
+    def playCurrentWaveform(self, event):
+        print(event)
+
+    def graphComponentWaveform(self, key):
+        if self.model.hasKey(key):
+            points = self.model.getPoints(key)
+            self.view.graphComponentWaveform(self, key, points)
+
+    def createCatalogWave(self, name:str):
+        if not self.model.nameExists(name):
+            self.view.addWaveToCatalog(self.keyIndexCounter, name)
+            self.view.closeWaveNameInputWidget()
+            self.model.createEmptyWave(self.keyIndexCounter, name)
+            self.view.showComponentGraph(self.keyIndexCounter)
+            self.keyIndexCounter += 1
+        else:
+            self.view.displayDupNameErrMsg()
+
+    def addPointToWave(self, keyIndex, x, y):
+        self.model.addPoint(keyIndex, x, y)
+        points = self.model.getPoints(keyIndex)
+        self.view.graphComponentWaveforms(points)

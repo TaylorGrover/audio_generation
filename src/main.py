@@ -1,5 +1,6 @@
 import sys
 
+from wave_app_model import WaveModel
 from wave_controller import WaveController
 from WaveGrapher import WaveView
 
@@ -11,7 +12,8 @@ if __name__ == "__main__":
     waveView.setWindowTitle("Graph Synthesis")
     availableGeometry = waveView.screen().availableGeometry()
     waveView.resize(availableGeometry.width(), availableGeometry.height())
-    waveController = WaveController(waveView)
+    waveModel = WaveModel()
+    waveController = WaveController(waveView, waveModel)
     waveView.show()
 
 
