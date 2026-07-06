@@ -136,8 +136,8 @@ class WaveView(QMainWindow):
             self.graphWidget.setPoints(list(zip(data['x'], data['y'])))
             self.graphWidget.graphPoints()
 
-    def graphComponentWaveform(self, key, x, y):
-        self.workspaceWidget.graphComponentWaveform(key, x, y)
+    def graphComponentWaveform(self, key, x, y, interp_x, interp_y):
+        self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y)
 
     def openCatalogAdditionDialog(self, key) -> bool:
         self.workspaceWidget.openCatalogAdditionDialog(key)
@@ -310,9 +310,10 @@ class WorkspaceWidget(QWidget):
     def emitPointAdditionSignal(self, key, x, y):
         self.pointAdditionSignal.emit(key, x, y)
 
-    def graphComponentWaveform(self, key, x, y):
+    def graphComponentWaveform(self, key, x, y, interp_x, interp_y):
         # TODO: Add graph widget to catalog
-        self.componentGraph.graphPoints(x, y)
+        self.componentGraph.graphPoints(x, y, interp_x, interp_y)
+        
     def createNewWaveformWindow(self):
         name = self.waveformNameInputWidget.getName()
         self.createCatalogWaveSignal.emit(name)
@@ -533,11 +534,13 @@ class ComponentGraphWidget(QWidget):
     def scatterPlot(self, x, y, pen=None):
         self.oscillator.scatterPlot(x, y, pen=pen)
 
-    def graphPoints(self, x, y):
+    def graphPoints(self, x, y, interp_x, interp_y):
         self.clearGraph()
         #x, y = zip(*self.points)
         self.oscillator.plot(x, y, pen=self.plotPen)
         self.oscillator.scatterPlot(x, y, pen=self.scatterPen)
+        self.oscillator.scatterPlot(interp_x, interp_y, pen=self.sineInterpolatedPen)
+        self.oscillator.plot(interp_x, interp_y, self.linearInterpolatedPen)
         #new_x = np.linspace(x[0], x[-1], 2 * len(x))
         """self.seed = np.interp(new_x, x, y)
         self.oscillator.scatterPlot(new_x, self.seed, pen=self.sineInterpolatedPen)
