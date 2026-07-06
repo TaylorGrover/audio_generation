@@ -88,9 +88,13 @@ class WaveController:
         print(event)
 
     def graphComponentWaveform(self, key):
-        if self.model.hasKey(key):
-            points = self.model.getPoints(key)
-            self.view.graphComponentWaveform(self, key, points)
+        x, y = self.model.getPointsXY(key)
+        if len(x) >= 2:
+            interp_x, interp_y = self.model.getInterpolatedXY(key)
+        else:
+            interp_x = x
+            interp_y = y
+        self.view.graphComponentWaveform(key, x, y, interp_x, interp_y)
 
     def createCatalogWave(self, name:str):
         if not self.model.nameExists(name):
@@ -104,10 +108,4 @@ class WaveController:
 
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
-        x, y = self.model.getPointsXY(keyIndex)
-        if len(x) >= 2:
-            interp_x, interp_y = self.model.getInterpolatedXY(keyIndex)
-        else:
-            interp_x = x
-            interp_y = y
-        self.view.graphComponentWaveform(keyIndex, x, y, interp_x, interp_y)
+        self.graphComponentWaveform(keyIndex)

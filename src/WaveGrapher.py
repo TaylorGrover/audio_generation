@@ -285,13 +285,12 @@ class WorkspaceWidget(QWidget):
         # Check if the centralGraph is currently in place
         item = self.gridLayout.itemAtPosition(0, 1)
         widget = item.widget()
-        print("showCOmponentGraph")
         if widget == self.centralGraph:
-            print("Yes")
             self.gridLayout.removeWidget(widget)
             widget.hide()
             self.componentGraph.setKeyIndex(keyIndex)
             self.gridLayout.addWidget(self.componentGraph, 0, 1)
+
     def displayDupNameErrMsg(self):
         self.waveformNameInputWidget.displayDupNameErrMsg()
 
@@ -388,6 +387,7 @@ class GenericGraphParametersWidget(QWidget):
 
 class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
+    clearGraphSignal = Signal()
     def __init__(self):
         super().__init__()
 
@@ -416,6 +416,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
     def graphPoints(self, event):
         print(event)
+        self.clearGraphSignal.emit()
         self.regraphSignal()
 
     def clearGraphAndPoints(self, event):
