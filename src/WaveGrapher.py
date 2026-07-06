@@ -136,8 +136,8 @@ class WaveView(QMainWindow):
             self.graphWidget.setPoints(list(zip(data['x'], data['y'])))
             self.graphWidget.graphPoints()
 
-    def graphComponentWaveform(self, key, points):
-        self.workspaceWidget.graphComponentWaveform(key, points)
+    def graphComponentWaveform(self, key, x, y):
+        self.workspaceWidget.graphComponentWaveform(key, x, y)
 
     def openCatalogAdditionDialog(self, key) -> bool:
         self.workspaceWidget.openCatalogAdditionDialog(key)
@@ -310,9 +310,9 @@ class WorkspaceWidget(QWidget):
     def emitPointAdditionSignal(self, key, x, y):
         self.pointAdditionSignal.emit(key, x, y)
 
-    def graphComponentWaveform(self, key, points):
-        if key in self.waveformWidgetDict:
-            self.waveformWidgetDict[key].graph(points)
+    def graphComponentWaveform(self, key, x, y):
+        # TODO: Add graph widget to catalog
+        self.componentGraph.graphPoints(x, y)
     def createNewWaveformWindow(self):
         name = self.waveformNameInputWidget.getName()
         self.createCatalogWaveSignal.emit(name)
@@ -533,14 +533,13 @@ class ComponentGraphWidget(QWidget):
     def scatterPlot(self, x, y, pen=None):
         self.oscillator.scatterPlot(x, y, pen=pen)
 
-    def graphPoints(self):
-        self.graphSignal.emit(self.keyIndex)
+    def graphPoints(self, x, y):
         self.clearGraph()
-        x, y = zip(*self.points)
+        #x, y = zip(*self.points)
         self.oscillator.plot(x, y, pen=self.plotPen)
         self.oscillator.scatterPlot(x, y, pen=self.scatterPen)
-        new_x = np.linspace(x[0], x[-1], 2 * len(x))
-        self.seed = np.interp(new_x, x, y)
+        #new_x = np.linspace(x[0], x[-1], 2 * len(x))
+        """self.seed = np.interp(new_x, x, y)
         self.oscillator.scatterPlot(new_x, self.seed, pen=self.sineInterpolatedPen)
         self.oscillator.plot(new_x, self.seed, pen=self.linearInterpolatedPen)
         if self.sineInterpolatorWidget.isChecked():
@@ -552,6 +551,7 @@ class ComponentGraphWidget(QWidget):
                 t = np.linspace(new_x[0], new_x[-1], int(duration * waveform.SAMPLE_RATE))
                 wave = waveform.seeded_waveform(amplitude, duration, 1 / duration, self.seed, waveform.SAMPLE_RATE, sine_count)
                 self.oscillator.plot(t, wave.T[0], pen=self.sineInterpolatedPen)
+        """
 
     def playWaveform(self):
         if self.isPlaying:

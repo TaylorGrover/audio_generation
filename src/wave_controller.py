@@ -104,5 +104,6 @@ class WaveController:
 
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
-        points = self.model.getPoints(keyIndex)
-        self.view.graphComponentWaveforms(points)
+        x, y = self.model.getPointsXY(keyIndex)
+        
+        self.view.graphComponentWaveform(keyIndex, x, y)
