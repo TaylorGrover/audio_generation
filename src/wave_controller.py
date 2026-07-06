@@ -105,5 +105,9 @@ class WaveController:
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
         x, y = self.model.getPointsXY(keyIndex)
-        interp_x, interp_y = self.model.getInterpolatedXY(keyIndex)
+        if len(x) >= 2:
+            interp_x, interp_y = self.model.getInterpolatedXY(keyIndex)
+        else:
+            interp_x = x
+            interp_y = y
         self.view.graphComponentWaveform(keyIndex, x, y, interp_x, interp_y)
