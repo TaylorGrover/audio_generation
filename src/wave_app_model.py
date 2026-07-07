@@ -85,6 +85,9 @@ class WaveModel:
         ).T[0]
         self.waveDict[key][self.sine_interp_str] = np.array([sine_time, wave])
 
+    def updateFrequency(self, key, baseFreq, cents, octave):
+        self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
+
     def getFrequency(self, key):
         return self.waveDict[key][self.freq_str]
 

@@ -790,11 +790,18 @@ FORM_TO_STR_MAP = {
 
 STRING_TO_FORM_MAP = dict((FORM_TO_STR_MAP[form], form) for form in FORM_TO_STR_MAP)
 
-def play(waveform, loop=False, sr=44100):
+def generateWaveFilepath():
     chars = [char for char in string.ascii_letters]
     name = "".join(np.random.choice(chars, 8, replace=True)) + ".wav"
     path = os.path.join(AUDIO_DIR, "tmp", name)
-    sf.write(path, waveform, sr)
+    return path
+
+def saveWavFile(filepath, wave, sample_rate):
+    sf.write(filepath, wave, sample_rate)
+
+def play(waveform, loop=False, sr=44100):
+    path = generateWaveFilepath()
+    saveWavFile(path, waveform, sr)
     url = QUrl.fromLocalFile(path)
     effect = QSoundEffect()
     effect.setSource(url)

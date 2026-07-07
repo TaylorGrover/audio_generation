@@ -23,6 +23,7 @@ class WaveView(QMainWindow):
     playSignal = Signal(int)
     graphSignal = Signal(int) # Emits the key for the specific graph to redraw
     pointAdditionSignal = Signal(int, float, float)
+    frequencyChangedSignal = Signal(int, str, int, int)
 
     def __init__(self):
         super().__init__()
@@ -44,6 +45,7 @@ class WaveView(QMainWindow):
         self.workspaceWidget.createCatalogWaveSignal.connect(lambda name: self.createCatalogWaveSignal.emit(name))
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
+        self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
     
     def addWaveToCatalog(self, key_index:int, name:str):
         self.workspaceWidget.addWaveToCatalog(key_index, name)
@@ -53,6 +55,9 @@ class WaveView(QMainWindow):
     
     def closeWaveNameInputWidget(self):
         self.workspaceWidget.closeWaveNameInputWidget()
+
+    def emitFrequencyChanged(self, keyIndex, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
 
     def emitCatalogWaveAdded(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
@@ -70,10 +75,6 @@ class WaveView(QMainWindow):
         loadWaveAction = QAction("&Load Waveform", self, shortcut="Ctrl+O", triggered=self.loadWaveformTrigger)
         # fileMenu.addAction(saveWaveAction)
         # fileMenu.addAction(loadWaveAction)
-
-    def playWave(self, wave):
-        ef = waveform.play(wave)
-        ef.play()
 
     def populateEditMenu(self, editMenu):
         """
@@ -206,6 +207,11 @@ class SineInterpolatorWidget(QWidget):
         
 
 class FrequencyWidget(QWidget):
+    """
+    Upon changing any of the frequency combo box, cents, or octave spin boxes, emit a signal with the widget values.
+    The new frequency should be recalculated outside of the widget
+    """
+    frequencyChangedSignal = Signal(str, int, int)
     def __init__(self):
         super().__init__()
         self.formLayout = QFormLayout(self)
@@ -213,21 +219,30 @@ class FrequencyWidget(QWidget):
         self.frequencySelector = QComboBox()
         self.frequencySelector.addItems(waveform.NOTE_LETTERS)
         self.frequencySelector.setMaximumSize(QSize(100, 100))
+        self.frequencySelector.currentTextChanged.connect(self.emitFrequencyParameters)
 
         self.centsSpin = QSpinBox()
         self.centsSpin.setRange(-100, 100)
         self.centsSpin.setMaximumSize(QSize(100, 100))
         self.centsSpin.setValue(0)
         self.centsSpin.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.centsSpin.valueChanged.connect(self.emitFrequencyParameters)
 
         self.octaveSpin = QSpinBox()
         self.octaveSpin.setRange(1, 7)
         self.octaveSpin.setValue(1)
         self.octaveSpin.setMaximumSize(QSize(100, 100))
+        self.octaveSpin.valueChanged.connect(self.emitFrequencyParameters)
 
         self.formLayout.addRow("Note:", self.frequencySelector)
         self.formLayout.addRow("Cents:", self.centsSpin)
         self.formLayout.addRow("Octave:", self.octaveSpin)
+
+    def emitFrequencyParameters(self):
+        baseFreq = self.frequencySelector.currentText()
+        cents = self.centsSpin.value()
+        octave = self.octaveSpin.value()
+        self.frequencyChangedSignal.emit(baseFreq, cents, octave)
 
     def getOctave(self):
         return self.octaveSpin.value()
@@ -264,6 +279,7 @@ class WorkspaceWidget(QWidget):
     playSignal = Signal(int)
     graphSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
+    frequencyChangedSignal = Signal(int, str, int, int)
 
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
@@ -280,6 +296,7 @@ class WorkspaceWidget(QWidget):
         self.centralGraph.playSignal.connect(self.emitPlaySignal)
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.componentGraph.playSignal.connect(self.emitPlaySignal)
+        self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
         self.catalogWidget = WaveformCatalogWidget()
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
@@ -302,6 +319,9 @@ class WorkspaceWidget(QWidget):
 
     def closeWaveNameInputWidget(self):
         self.waveformNameInputWidget.closeWindowAndClearInput()
+
+    def emitFrequencyParameters(self, keyIndex, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
 
     def emitCatalogWaveAddInitiate(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
@@ -394,6 +414,7 @@ class GenericGraphParametersWidget(QWidget):
 class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
     clearGraphSignal = Signal()
+    frequencyChangedSignal = Signal(str, int, int)
     def __init__(self):
         super().__init__()
 
@@ -407,9 +428,8 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.durationSpin.setValue(3)
         self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
 
-        self.sineInterpolatorWidget = SineInterpolatorWidget()
-        self.sineInterpolatorWidget.changedSignal.connect(self.graphPoints)
 
+        self.sineInterpolatorWidget = SineInterpolatorWidget()
         self.frequencyWidget = FrequencyWidget()
 
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
@@ -419,6 +439,14 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
         self.controlLayout.setSpacing(4)
         self.controlLayout.setContentsMargins(0, 0, 0, 0)
+
+        # Slots and Signals
+        self.sineInterpolatorWidget.changedSignal.connect(self.graphPoints)
+        self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+
+
+    def emitFrequencyParameters(self, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(baseFreq, cents, octave)
 
     def graphPoints(self, event):
         print(event)
@@ -452,6 +480,8 @@ class ComponentGraphWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
     playSignal = Signal(int)
     graphSignal = Signal(int)
+    # Throw the index in as well 
+    frequencyChangedSignal = Signal(int, str, int, int)
 
     def __init__(self):
         super().__init__()
@@ -490,11 +520,15 @@ class ComponentGraphWidget(QWidget):
         self.graphParametersWidget = GraphParametersWidget()
         self.graphParametersWidget.regraphSignal.connect(self.graphPoints)
         self.graphParametersWidget.playSignal.connect(self.emitPlaySignal)
+        self.graphParametersWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def emitFrequencyParameters(self, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(self.keyIndex, baseFreq, cents, octave)
 
     def emitPlaySignal(self):
         self.playSignal.emit(self.keyIndex)

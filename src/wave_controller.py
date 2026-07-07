@@ -1,5 +1,7 @@
 from action_monitor import ActionMonitor
+import utilities
 import waveform
+import winsound
 
 """
 This is the interface between GUI and wave data model.
@@ -58,10 +60,9 @@ class WaveController:
         # TODO: Change point position for component oscillator
 
         # TODO: Change fundamental frequency of component oscillator
-
         # TODO: Change cents of oscillator
-
         # TODO: Change octave of oscillator
+        self.view.frequencyChangedSignal.connect(self.updateFrequency)
 
         # TODO: Change duration of global waveform
 
@@ -88,8 +89,14 @@ class WaveController:
 
     def playCurrentWaveform(self, key):
         wave = self.model.getSineExtrapolatedWave(key)
-        print(wave.shape)
-        self.view.playWave(wave)
+        operating_system = utilities.getOS()
+        if operating_system == "windows":
+            path = waveform.generateWaveFilepath()
+            waveform.saveWavFile(path, wave, self.model.sample_rate)
+            winsound.PlaySound(path, winsound.SND_ASYNC)
+        elif operating_system == "linux":
+            ef = waveform.play(wave)
+            ef.play()
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)
@@ -112,6 +119,9 @@ class WaveController:
             self.keyIndexCounter += 1
         else:
             self.view.displayDupNameErrMsg()
+
+    def updateFrequency(self, keyIndex, baseFreq, cents, octave):
+        self.model.updateFrequency(keyIndex, baseFreq, cents, octave)
 
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
