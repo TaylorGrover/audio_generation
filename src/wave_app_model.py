@@ -44,6 +44,9 @@ class WaveModel:
     def getInterpolatedXY(self, key):
         return self.getInterpolated(key).T
 
+    def getSineInterpolatedXY(self, key):
+        return self.waveDict[key][self.sine_interp_str]
+
     def addPoint(self, key, x, y):
         """
         Add a new point to a component waveform.  
@@ -53,7 +56,7 @@ class WaveModel:
             bisect.insort(self.waveDict[key][self.point_key_str], [x, y], key=lambda t: t[0])
             if self.getPointCount(key) >= 2:
                 self.updateLinearInterpolation(key)
-                #self.updateSineInterpolation(key)
+                self.updateSineInterpolation(key)
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
@@ -61,9 +64,34 @@ class WaveModel:
         new_y = np.interp(new_x, x, y)
         self.waveDict[key][self.linear_interp_str] = np.array([new_x, new_y]).T
 
-    def updateSineInterpolation(self, key:int, amp:float, sine_count:int):
+    def updateSineInterpolation(self, key:int):
         x, y = self.getInterpolatedXY(key)
-        
+        duration = x[-1] - x[0]
+        sine_time = np.linspace(x[0], x[-1], int(duration * self.sample_rate))
+        amplitude = np.max(np.abs(y))
+        wave = waveform.seeded_waveform(
+            amplitude
+            , duration
+            , 1.0 / duration
+            , y
+            , self.sample_rate
+            , sine_count=13 # TODO: Fix this 
+        ).T[0]
+        self.waveDict[key][self.sine_interp_str] = np.array([sine_time, wave])
+
+    def getExtrapolatedWave(self, key, volume, duration, frequency):
+        wavelength_sample_count = int(self.sample_rate / frequency)
+        total_sample_count = int(duration * self.sample_rate)
+        x, y = self.getInterpolatedXY(key)
+        t_base = np.linspace(0, x[-1] - x[0], wavelength_sample_count)
+        t_indices = np.linspace(0, total_sample_count, total_sample_count)
+        t_modulo = t_indices % wavelength_sample_count
+        y_interp = np.interp(t_base, x, y)
+        y_interp /= np.max(np.abs(y_interp), axis=0)
+        wave = volume * y_interp[t_modulo]
+        return wave
+
+
         
 
 

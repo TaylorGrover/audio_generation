@@ -20,7 +20,7 @@ class WaveView(QMainWindow):
 
     initiateCatalogAdditionSignal = Signal(int)
     createCatalogWaveSignal = Signal(str)
-    playSignal = Signal(bool)
+    playSignal = Signal(int)
     graphSignal = Signal(int) # Emits the key for the specific graph to redraw
     pointAdditionSignal = Signal(int, float, float)
 
@@ -95,8 +95,9 @@ class WaveView(QMainWindow):
     def emitRedoSignal(self, event):
         self.redoSignal.emit(event)
 
-    def emitPlaySignal(self, event):
-        self.playSignal.emit(event)
+    def emitPlaySignal(self, index):
+        self.playSignal.emit(index)
+
     def emitPointAdditionSignal(self, keyIndex, x, y):
         self.pointAdditionSignal.emit(keyIndex, x, y)
 
@@ -136,8 +137,8 @@ class WaveView(QMainWindow):
             self.graphWidget.setPoints(list(zip(data['x'], data['y'])))
             self.graphWidget.graphPoints()
 
-    def graphComponentWaveform(self, key, x, y, interp_x, interp_y):
-        self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y)
+    def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
+        self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
 
     def openCatalogAdditionDialog(self, key) -> bool:
         self.workspaceWidget.openCatalogAdditionDialog(key)
@@ -256,7 +257,7 @@ class WorkspaceWidget(QWidget):
     createCatalogWaveSignal = Signal(str)
     swapGraphViewSignal = Signal(int)
     
-    playSignal = Signal(bool)
+    playSignal = Signal(int)
     graphSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
 
@@ -269,11 +270,12 @@ class WorkspaceWidget(QWidget):
         self.waveformNameInputWidget.move(self.maxWidth//2, self.maxHeight//2)
         self.waveformWidgetDict = {}
         self.gridLayout = QGridLayout(self)
-        self.componentGraph = ComponentGraphWidget(0)
+        self.componentGraph = ComponentGraphWidget()
         self.centralGraph = CentralGraphWidget()
 
         self.centralGraph.playSignal.connect(self.emitPlaySignal)
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
+        self.componentGraph.playSignal.connect(self.emitPlaySignal)
 
         self.catalogWidget = WaveformCatalogWidget()
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
@@ -300,8 +302,8 @@ class WorkspaceWidget(QWidget):
     def emitCatalogWaveAddInitiate(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
 
-    def emitPlaySignal(self, event):
-        self.playSignal.emit(event)
+    def emitPlaySignal(self, index):
+        self.playSignal.emit(index)
 
     def emitGraphSignal(self, key):
         self.graphSignal.emit(key)
@@ -309,9 +311,9 @@ class WorkspaceWidget(QWidget):
     def emitPointAdditionSignal(self, key, x, y):
         self.pointAdditionSignal.emit(key, x, y)
 
-    def graphComponentWaveform(self, key, x, y, interp_x, interp_y):
+    def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
         # TODO: Add graph widget to catalog
-        self.componentGraph.graphPoints(x, y, interp_x, interp_y)
+        self.componentGraph.graphPoints(x, y, interp_x, interp_y, sine_x, sine_y)
         
     def createNewWaveformWindow(self):
         name = self.waveformNameInputWidget.getName()
@@ -351,7 +353,6 @@ class WaveformCatalogWidget(QWidget):
         self.initiateCatalogAdditionSignal.emit(event)
 
     def addWaveWidgetToCatalog(self, key_index, name:str):
-        print("add wave to catalog")
         self.labeledWavesDict[key_index] = {
             "name": name,
         }
@@ -361,7 +362,8 @@ class WaveformCatalogWidget(QWidget):
         self.swapGraphSignal.emit(key_index)
 
 class GenericGraphParametersWidget(QWidget):
-    playSignal = Signal(bool)
+    # Contains the index of the waveform
+    playSignal = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -383,7 +385,7 @@ class GenericGraphParametersWidget(QWidget):
         self.controlLayout.addRow("", self.playButton)
 
     def playWaveform(self, event):
-        self.playSignal.emit(event)
+        self.playSignal.emit(0)
 
 class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
@@ -424,7 +426,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         print(type(event))
 
 class CentralGraphWidget(QWidget):
-    playSignal = Signal(bool)
+    playSignal = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -444,14 +446,13 @@ class CentralGraphWidget(QWidget):
 
 class ComponentGraphWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
-    playSignal = Signal(bool)
+    playSignal = Signal(int)
     graphSignal = Signal(int)
 
-    def __init__(self, keyIndex:int):
+    def __init__(self):
         super().__init__()
-        self.keyIndex = keyIndex # For tracking the widgets in the controller
         self.isPlaying = False
-
+        self.keyIndex = 0
         self.seed = np.array([])
         self.points = []
         self.gridLayout = QGridLayout(self)
@@ -484,11 +485,18 @@ class ComponentGraphWidget(QWidget):
 
         self.graphParametersWidget = GraphParametersWidget()
         self.graphParametersWidget.regraphSignal.connect(self.graphPoints)
+        self.graphParametersWidget.playSignal.connect(self.emitPlaySignal)
 
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def emitPlaySignal(self):
+        self.playSignal.emit(self.keyIndex)
+
+    def setKeyIndex(self, keyIndex):
+        self.keyIndex = keyIndex
 
     def calculateSeed(self, points):
         """
@@ -500,14 +508,6 @@ class ComponentGraphWidget(QWidget):
         new_x = np.linspace(x[0], x[-1], len(x))
         seed = np.interp(new_x, x, y)
         return seed 
-    def setKeyIndex(self, keyIndex):
-        self.keyIndex = keyIndex
-
-    def get_zero_shifted_x(self, points):
-        x, y = zip(*points)
-        x_shifted = list(map(lambda t: t - x[0], x))
-        return x_shifted
-
 
     def addPoint(self, event):
         click_event, = event
@@ -515,9 +515,6 @@ class ComponentGraphWidget(QWidget):
         if self.viewBox.sceneBoundingRect().contains(click_event.scenePos()):
             plotPosition = self.viewBox.mapSceneToView(scenePos)
             self.pointAdditionSignal.emit(self.keyIndex, plotPosition.x(), plotPosition.y())
-            #bisect.insort(self.points, [plotPosition.x(), plotPosition.y()], key=lambda t: t[0])
-            #self.graphPoints()
-            #self.seed = self.calculateSeed(self.points)
 
     def clearGraphAndPoints(self):
         self.points = []
@@ -535,13 +532,14 @@ class ComponentGraphWidget(QWidget):
     def scatterPlot(self, x, y, pen=None):
         self.oscillator.scatterPlot(x, y, pen=pen)
 
-    def graphPoints(self, x, y, interp_x, interp_y):
+    def graphPoints(self, x, y, interp_x, interp_y, sine_x, sine_y):
         self.clearGraph()
         #x, y = zip(*self.points)
         self.oscillator.plot(x, y, pen=self.plotPen)
         self.oscillator.scatterPlot(x, y, pen=self.scatterPen)
         self.oscillator.scatterPlot(interp_x, interp_y, pen=self.sineInterpolatedPen)
-        self.oscillator.plot(interp_x, interp_y, self.linearInterpolatedPen)
+        self.oscillator.plot(interp_x, interp_y, pen=self.linearInterpolatedPen)
+        self.oscillator.plot(sine_x, sine_y, pen=self.sineInterpolatedPen)
         #new_x = np.linspace(x[0], x[-1], 2 * len(x))
         """self.seed = np.interp(new_x, x, y)
         self.oscillator.scatterPlot(new_x, self.seed, pen=self.sineInterpolatedPen)

@@ -84,17 +84,21 @@ class WaveController:
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
 
-    def playCurrentWaveform(self, event):
-        print(event)
+    def playCurrentWaveform(self, index):
+        print("What the: {}".format(index))
+        
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)
         if len(x) >= 2:
             interp_x, interp_y = self.model.getInterpolatedXY(key)
+            sine_x, sine_y = self.model.getSineInterpolatedXY(key)
         else:
             interp_x = x
             interp_y = y
-        self.view.graphComponentWaveform(key, x, y, interp_x, interp_y)
+            sine_x = x
+            sine_y = y
+        self.view.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
 
     def createCatalogWave(self, name:str):
         if not self.model.nameExists(name):
