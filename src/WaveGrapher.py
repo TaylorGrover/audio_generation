@@ -466,7 +466,7 @@ class CentralGraphWidget(QWidget):
         self.gridLayout = QGridLayout(self)
         self.graphParametersWidget = GenericGraphParametersWidget()
 
-        self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(e))
+        self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(0))
         self.window = pg.GraphicsLayoutWidget()
         self.graph = self.window.addPlot(title="Global Graph", row=0, col=0)
 

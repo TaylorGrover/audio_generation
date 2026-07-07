@@ -88,8 +88,10 @@ class WaveController:
         self.view.openCatalogAdditionDialog(event)
 
     def playCurrentWaveform(self, key):
-        wave = self.model.getSineExtrapolatedWave(key)
         operating_system = utilities.getOS()
+        if key == 0: # This might be bad design, but the zero index is the global view
+            wave = self.model.getCombinedWave()
+        wave = self.model.getSineExtrapolatedWave(key)
         if operating_system == "windows":
             path = waveform.generateWaveFilepath()
             waveform.saveWavFile(path, wave, self.model.sample_rate)

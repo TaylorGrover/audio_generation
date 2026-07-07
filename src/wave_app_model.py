@@ -118,6 +118,8 @@ class WaveModel:
         wave = volume * waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count)
         return wave
 
+    def getCombinedWave(self, norm=True):
+        return np.zeros_like(self.t)
 
 class Project:
     def __init__(self, project_name:str):
