@@ -1,4 +1,6 @@
 from action_monitor import ActionMonitor
+import waveform
+
 """
 This is the interface between GUI and wave data model.
 """
@@ -84,9 +86,10 @@ class WaveController:
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
 
-    def playCurrentWaveform(self, index):
-        print("What the: {}".format(index))
-        
+    def playCurrentWaveform(self, key):
+        wave = self.model.getSineExtrapolatedWave(key)
+        print(wave.shape)
+        self.view.playWave(wave)
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)

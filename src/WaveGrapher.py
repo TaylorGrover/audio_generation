@@ -71,6 +71,10 @@ class WaveView(QMainWindow):
         # fileMenu.addAction(saveWaveAction)
         # fileMenu.addAction(loadWaveAction)
 
+    def playWave(self, wave):
+        ef = waveform.play(wave)
+        ef.play()
+
     def populateEditMenu(self, editMenu):
         """
         File menu functions:

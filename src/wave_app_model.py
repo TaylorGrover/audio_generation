@@ -9,16 +9,22 @@ class WaveModel:
         self.name_key_str = "name"
         self.linear_interp_str = "linear_interp"
         self.sine_interp_str = "sine_interp"
+        self.freq_str = "frequency"
+        self.amp_str = "amplitude"
+        self.sine_count_str = "sine_count"
         self.duration = 5
         self.sample_rate = 44100
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
 
     def createEmptyWave(self, key_index:int, name:str):
         self.waveDict[key_index] = {
-            self.name_key_str: name,
-            self.point_key_str: [],
-            self.linear_interp_str: np.array([[]]),
-            self.sine_interp_str: np.array([])
+            self.name_key_str: name
+            , self.point_key_str: []
+            , self.linear_interp_str: np.array([[]])
+            , self.sine_interp_str: np.array([])
+            , self.amp_str: 1.0
+            , self.freq_str: waveform.F
+            , self.sine_count_str: 13
         }
 
     def nameExists(self, name:str) -> bool:
@@ -79,20 +85,35 @@ class WaveModel:
         ).T[0]
         self.waveDict[key][self.sine_interp_str] = np.array([sine_time, wave])
 
-    def getExtrapolatedWave(self, key, volume, duration, frequency):
-        wavelength_sample_count = int(self.sample_rate / frequency)
-        total_sample_count = int(duration * self.sample_rate)
+    def getFrequency(self, key):
+        return self.waveDict[key][self.freq_str]
+
+    def getDuration(self):
+        return self.duration
+    def getAmplitude(self, key):
+        return self.waveDict[key][self.amp_str]
+    def getSineCount(self, key):
+        return self.waveDict[key][self.sine_count_str]
+
+    def getExtrapolatedWave(self, key):
+        wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
+        total_sample_count = int(self.duration * self.sample_rate)
         x, y = self.getInterpolatedXY(key)
         t_base = np.linspace(0, x[-1] - x[0], wavelength_sample_count)
-        t_indices = np.linspace(0, total_sample_count, total_sample_count)
+        t_indices = np.linspace(0, total_sample_count, total_sample_count).astype(int)
         t_modulo = t_indices % wavelength_sample_count
         y_interp = np.interp(t_base, x, y)
         y_interp /= np.max(np.abs(y_interp), axis=0)
-        wave = volume * y_interp[t_modulo]
+        wave = self.getAmplitude(key) * y_interp[t_modulo]
         return wave
 
-
-        
+    def getSineExtrapolatedWave(self, key):
+        volume = self.getAmplitude(key)
+        frequency = self.getFrequency(key)
+        sine_count = self.getSineCount(key)
+        x, y = self.getInterpolatedXY(key)
+        wave = volume * waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count)
+        return wave
 
 
 class Project:
