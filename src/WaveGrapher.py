@@ -24,6 +24,7 @@ class WaveView(QMainWindow):
     graphSignal = Signal(int) # Emits the key for the specific graph to redraw
     pointAdditionSignal = Signal(int, float, float)
     frequencyChangedSignal = Signal(int, str, int, int)
+    clearGraphSignal = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -46,6 +47,7 @@ class WaveView(QMainWindow):
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
+        self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
     
     def addWaveToCatalog(self, key_index:int, name:str):
         self.workspaceWidget.addWaveToCatalog(key_index, name)
@@ -64,6 +66,9 @@ class WaveView(QMainWindow):
 
     def emitGraphSignal(self, key):
         self.graphSignal.emit(key)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
 
     def populateFileMenu(self, fileMenu):
         """
@@ -278,6 +283,7 @@ class WorkspaceWidget(QWidget):
     
     playSignal = Signal(int)
     graphSignal = Signal(int)
+    clearGraphSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
     frequencyChangedSignal = Signal(int, str, int, int)
 
@@ -297,6 +303,7 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.componentGraph.playSignal.connect(self.emitPlaySignal)
         self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
 
         self.catalogWidget = WaveformCatalogWidget()
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
@@ -304,6 +311,10 @@ class WorkspaceWidget(QWidget):
 
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
+
     def showComponentGraph(self, keyIndex:int):
         # Check if the centralGraph is currently in place
         item = self.gridLayout.itemAtPosition(0, 1)
@@ -454,8 +465,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.regraphSignal()
 
     def clearGraphAndPoints(self, event):
-        print(event)
-        print(type(event))
+        self.clearGraphSignal.emit()
 
 class CentralGraphWidget(QWidget):
     playSignal = Signal(int)
@@ -480,6 +490,8 @@ class ComponentGraphWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
     playSignal = Signal(int)
     graphSignal = Signal(int)
+    clearGraphSignal = Signal(int)
+    regraphSignal = Signal(int)
     # Throw the index in as well 
     frequencyChangedSignal = Signal(int, str, int, int)
 
@@ -519,6 +531,7 @@ class ComponentGraphWidget(QWidget):
 
         self.graphParametersWidget = GraphParametersWidget()
         self.graphParametersWidget.regraphSignal.connect(self.graphPoints)
+        self.graphParametersWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.graphParametersWidget.playSignal.connect(self.emitPlaySignal)
         self.graphParametersWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
@@ -532,6 +545,10 @@ class ComponentGraphWidget(QWidget):
 
     def emitPlaySignal(self):
         self.playSignal.emit(self.keyIndex)
+
+    def emitClearGraphSignal(self):
+        self.clearGraph()
+        self.clearGraphSignal.emit(self.keyIndex)
 
     def setKeyIndex(self, keyIndex):
         self.keyIndex = keyIndex

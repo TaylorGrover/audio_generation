@@ -67,6 +67,7 @@ class WaveController:
         # TODO: Change duration of global waveform
 
         # TODO: Clear component waveform
+        self.view.clearGraphSignal.connect(self.clearGraphPoints)
 
         # TODO: Copy waveform to envelope folder
 
@@ -128,3 +129,6 @@ class WaveController:
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
         self.graphComponentWaveform(keyIndex)
+
+    def clearGraphPoints(self, keyIndex):
+        self.model.clearGraphPoints(keyIndex)

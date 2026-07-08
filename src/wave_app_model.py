@@ -64,6 +64,11 @@ class WaveModel:
                 self.updateLinearInterpolation(key)
                 self.updateSineInterpolation(key)
 
+    def clearGraphPoints(self, keyIndex):
+        self.waveDict[keyIndex][self.point_key_str] = []
+        self.waveDict[keyIndex][self.linear_interp_str] = np.array([[]])
+        self.waveDict[keyIndex][self.sine_interp_str] = np.array([])
+
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
         new_x = np.linspace(x[0], x[-1], interp_factor * len(x))
