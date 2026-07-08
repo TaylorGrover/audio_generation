@@ -46,6 +46,12 @@ class WaveView(QMainWindow):
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
+
+    def playWave(self, wave):
+        self.wave = wave
+        ef = waveform.play(self.wave)
+        print(np.max(np.abs(self.wave), axis=0))
+        ef.play()
     
     def addWaveToCatalog(self, key_index:int, name:str):
         self.workspaceWidget.addWaveToCatalog(key_index, name)
@@ -451,7 +457,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
     def graphPoints(self, event):
         print(event)
         self.clearGraphSignal.emit()
-        self.regraphSignal()
+        self.regraphSignal.emit()
 
     def clearGraphAndPoints(self, event):
         print(event)

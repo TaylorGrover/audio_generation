@@ -15,7 +15,7 @@ import string
 import sys
 import time
 
-np.random.seed(0)
+np.random.seed(int(time.time()))
 
 AUDIO_DIR = "audio"
 

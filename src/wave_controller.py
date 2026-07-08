@@ -1,7 +1,9 @@
 from action_monitor import ActionMonitor
+import playsound
 import utilities
 import waveform
-import winsound
+if utilities.getOS() == "windows":
+    import winsound
 
 """
 This is the interface between GUI and wave data model.
@@ -92,13 +94,15 @@ class WaveController:
         if key == 0: # This might be bad design, but the zero index is the global view
             wave = self.model.getCombinedWave()
         wave = self.model.getSineExtrapolatedWave(key)
+        path = waveform.generateWaveFilepath()
+        print(path)
+        waveform.saveWavFile(path, wave, self.model.sample_rate)
         if operating_system == "windows":
-            path = waveform.generateWaveFilepath()
-            waveform.saveWavFile(path, wave, self.model.sample_rate)
             winsound.PlaySound(path, winsound.SND_ASYNC)
         elif operating_system == "linux":
-            ef = waveform.play(wave)
-            ef.play()
+            whatisit = playsound.playsound(path, block=False)
+            print(whatisit)
+            print(type(whatisit))
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)
