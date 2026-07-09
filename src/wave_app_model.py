@@ -112,6 +112,19 @@ class WaveModel:
     def getSineCount(self, key):
         return self.waveDict[key][self.sine_count_str]
 
+    def getSineChecked(self, key):
+        return self.waveDict[key][self.sine_checked_str]
+
+    def getWave(self, key:int):
+        """
+        Generate wave based on checked status
+        """
+        if self.waveDict[key][self.sine_checked_str]:
+            wave = self.getSineExtrapolatedWave(key)
+        else:
+            wave = self.getExtrapolatedWave(key)
+        return wave
+
     def getExtrapolatedWave(self, key):
         wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
         total_sample_count = int(self.duration * self.sample_rate)

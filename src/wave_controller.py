@@ -96,23 +96,24 @@ class WaveController:
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
 
-    def updateSineInterpolationChecked(self, key:int, checkState):
-        self.model.updateSineInterpolationChecked(key, checkState)
+    def updateSineInterpolationChecked(self, key:int, isChecked:bool):
+        self.model.updateSineInterpolationChecked(key, isChecked)
 
     def playCurrentWaveform(self, key):
         operating_system = utilities.getOS()
         if key == 0: # This might be bad design, but the zero index is the global view
             wave = self.model.getCombinedWave()
-        wave = self.model.getSineExtrapolatedWave(key)
-        path = waveform.generateWaveFilepath()
-        print(path)
-        waveform.saveWavFile(path, wave, self.model.sample_rate)
-        if operating_system == "windows":
-            winsound.PlaySound(path, winsound.SND_ASYNC)
-        elif operating_system == "linux":
-            whatisit = playsound.playsound(path, block=False)
-            print(whatisit)
-            print(type(whatisit))
+        else:
+            wave = self.model.getWave(key)
+            path = waveform.generateWaveFilepath()
+            print(path)
+            waveform.saveWavFile(path, wave, self.model.sample_rate)
+            if operating_system == "windows":
+                winsound.PlaySound(path, winsound.SND_ASYNC)
+            elif operating_system == "linux":
+                whatisit = playsound.playsound(path, block=False)
+                print(whatisit)
+                print(type(whatisit))
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)
