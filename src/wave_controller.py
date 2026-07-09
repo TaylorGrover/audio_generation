@@ -1,7 +1,9 @@
 from action_monitor import ActionMonitor
+import playsound
 import utilities
 import waveform
-import winsound
+if utilities.getOS() == "windows":
+    import winsound
 
 """
 This is the interface between GUI and wave data model.
@@ -21,6 +23,9 @@ class WaveController:
         self.keyIndexCounter = 1
         self.view = view 
         self.model = model
+
+        # TODO: Decide between initializing the model parameters based on the view defaults or vice versa.
+        
 
         self.actionMonitor = ActionMonitor()
 
@@ -42,6 +47,9 @@ class WaveController:
 
         # TODO: Add an interpolating point to a wave, referenced by index or name
         self.view.pointAdditionSignal.connect(self.addPointToWave)
+
+        # TODO: Check or uncheck sine interpolation
+        self.view.sineStateChangedSignal.connect(self.updateSineInterpolationChecked)
 
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
@@ -88,18 +96,24 @@ class WaveController:
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
 
+    def updateSineInterpolationChecked(self, key:int, isChecked:bool):
+        self.model.updateSineInterpolationChecked(key, isChecked)
+
     def playCurrentWaveform(self, key):
         operating_system = utilities.getOS()
         if key == 0: # This might be bad design, but the zero index is the global view
             wave = self.model.getCombinedWave()
-        wave = self.model.getSineExtrapolatedWave(key)
-        if operating_system == "windows":
+        else:
+            wave = self.model.getWave(key)
             path = waveform.generateWaveFilepath()
+            print(path)
             waveform.saveWavFile(path, wave, self.model.sample_rate)
-            winsound.PlaySound(path, winsound.SND_ASYNC)
-        elif operating_system == "linux":
-            ef = waveform.play(wave)
-            ef.play()
+            if operating_system == "windows":
+                winsound.PlaySound(path, winsound.SND_ASYNC)
+            elif operating_system == "linux":
+                whatisit = playsound.playsound(path, block=False)
+                print(whatisit)
+                print(type(whatisit))
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)
