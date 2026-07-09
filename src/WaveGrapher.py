@@ -426,6 +426,8 @@ class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
     clearGraphSignal = Signal()
     frequencyChangedSignal = Signal(str, int, int)
+    emitCheckedSignal = Signal(QtCore.Qt.CheckState)
+
     def __init__(self):
         super().__init__()
 
@@ -452,17 +454,18 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.controlLayout.setContentsMargins(0, 0, 0, 0)
 
         # Slots and Signals
-        self.sineInterpolatorWidget.changedSignal.connect(self.graphPoints)
+        self.sineInterpolatorWidget.changedSignal.connect(self.emitCheckedSignal)
         self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
 
     def emitFrequencyParameters(self, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(baseFreq, cents, octave)
 
+
     def graphPoints(self, event):
-        print(event)
         self.clearGraphSignal.emit()
-        self.regraphSignal()
+        # TODO: Fix below
+        #self.regraphSignal()
 
     def clearGraphAndPoints(self, event):
         self.clearGraphSignal.emit()
