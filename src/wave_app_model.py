@@ -1,5 +1,6 @@
 import bisect
 import numpy as np
+from scipy.interpolate import CubicSpline
 import waveform
 
 class WaveModel:
@@ -12,6 +13,7 @@ class WaveModel:
         self.freq_str = "frequency"
         self.amp_str = "amplitude"
         self.sine_count_str = "sine_count"
+        self.sine_checked_str = "sine_checked"
         self.duration = 5
         self.sample_rate = 44100
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
@@ -25,6 +27,7 @@ class WaveModel:
             , self.amp_str: 1.0
             , self.freq_str: waveform.F
             , self.sine_count_str: 13
+            , self.sine_checked_str: True
         }
 
     def nameExists(self, name:str) -> bool:
@@ -64,11 +67,19 @@ class WaveModel:
                 self.updateLinearInterpolation(key)
                 self.updateSineInterpolation(key)
 
+    def clearGraphPoints(self, keyIndex):
+        self.waveDict[keyIndex][self.point_key_str] = []
+        self.waveDict[keyIndex][self.linear_interp_str] = np.array([[]])
+        self.waveDict[keyIndex][self.sine_interp_str] = np.array([])
+
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
         new_x = np.linspace(x[0], x[-1], interp_factor * len(x))
         new_y = np.interp(new_x, x, y)
         self.waveDict[key][self.linear_interp_str] = np.array([new_x, new_y]).T
+
+    def updateSineInterpolationChecked(self, key:int, isChecked):
+        self.waveDict[key][self.sine_checked_str] = isChecked
 
     def updateSineInterpolation(self, key:int):
         x, y = self.getInterpolatedXY(key)
@@ -93,6 +104,9 @@ class WaveModel:
 
     def getDuration(self):
         return self.duration
+    def setDuration(self, duration:float):
+        if duration > 0:
+            self.duration = duration
     def getAmplitude(self, key):
         return self.waveDict[key][self.amp_str]
     def getSineCount(self, key):

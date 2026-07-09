@@ -24,6 +24,9 @@ class WaveController:
         self.view = view 
         self.model = model
 
+        # TODO: Decide between initializing the model parameters based on the view defaults or vice versa.
+        
+
         self.actionMonitor = ActionMonitor()
 
         ##### SIGNALS #####
@@ -44,6 +47,9 @@ class WaveController:
 
         # TODO: Add an interpolating point to a wave, referenced by index or name
         self.view.pointAdditionSignal.connect(self.addPointToWave)
+
+        # TODO: Check or uncheck sine interpolation
+        self.view.sineStateChangedSignal.connect(self.updateSineInterpolationChecked)
 
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
@@ -69,6 +75,7 @@ class WaveController:
         # TODO: Change duration of global waveform
 
         # TODO: Clear component waveform
+        self.view.clearGraphSignal.connect(self.clearGraphPoints)
 
         # TODO: Copy waveform to envelope folder
 
@@ -88,6 +95,9 @@ class WaveController:
         """
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
+
+    def updateSineInterpolationChecked(self, key:int, checkState):
+        self.model.updateSineInterpolationChecked(key, checkState)
 
     def playCurrentWaveform(self, key):
         operating_system = utilities.getOS()
@@ -132,3 +142,6 @@ class WaveController:
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
         self.graphComponentWaveform(keyIndex)
+
+    def clearGraphPoints(self, keyIndex):
+        self.model.clearGraphPoints(keyIndex)

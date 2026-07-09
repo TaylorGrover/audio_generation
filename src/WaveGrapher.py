@@ -24,6 +24,8 @@ class WaveView(QMainWindow):
     graphSignal = Signal(int) # Emits the key for the specific graph to redraw
     pointAdditionSignal = Signal(int, float, float)
     frequencyChangedSignal = Signal(int, str, int, int)
+    clearGraphSignal = Signal(int)
+    sineStateChangedSignal = Signal(int, bool)
 
     def __init__(self):
         super().__init__()
@@ -46,12 +48,11 @@ class WaveView(QMainWindow):
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
+        self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
+        self.workspaceWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
 
-    def playWave(self, wave):
-        self.wave = wave
-        ef = waveform.play(self.wave)
-        print(np.max(np.abs(self.wave), axis=0))
-        ef.play()
+    def emitSineStateChanged(self, keyIndex, isChecked):
+        self.sineStateChangedSignal.emit(keyIndex, isChecked)
     
     def addWaveToCatalog(self, key_index:int, name:str):
         self.workspaceWidget.addWaveToCatalog(key_index, name)
@@ -70,6 +71,9 @@ class WaveView(QMainWindow):
 
     def emitGraphSignal(self, key):
         self.graphSignal.emit(key)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
 
     def populateFileMenu(self, fileMenu):
         """
@@ -178,7 +182,7 @@ class VolumeControlsWidget(QWidget):
         return self.volumeSlider.value() / 10.0
 
 class SineInterpolatorWidget(QWidget):
-    changedSignal = Signal(QtCore.Qt.CheckState)
+    changedSignal = Signal(bool)
 
     def __init__(self):
         super().__init__()
@@ -191,9 +195,9 @@ class SineInterpolatorWidget(QWidget):
         self.sineCountSpin = QSpinBox()
         self.sineCountSpin.setRange(1, 50)
         self.sineCountSpin.setValue(13)
-        self.sineCountSpin.setMinimumSize(QSize(30, 30))
+        self.sineCountSpin.setMinimumSize(QSize(100, 30))
         self.sineCountSpin.setMaximumSize(QSize(100, 100))
-        self.sineCountSpin.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        #self.sineCountSpin.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.sineCountSpin.valueChanged.connect(self.stateChanged)
 
         self.formLayout.addRow("Use sine interpolation:", self.sinePlotCheckBox)
@@ -201,9 +205,7 @@ class SineInterpolatorWidget(QWidget):
 
 
     def stateChanged(self, event):
-        print("State changed: ", event)
-        print(type(event))
-        self.changedSignal.emit(event)
+        self.changedSignal.emit(event == QtCore.Qt.CheckState.Checked)
 
     def isChecked(self):
         return self.sinePlotCheckBox.isChecked()
@@ -284,8 +286,10 @@ class WorkspaceWidget(QWidget):
     
     playSignal = Signal(int)
     graphSignal = Signal(int)
+    clearGraphSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
     frequencyChangedSignal = Signal(int, str, int, int)
+    sineStateChangedSignal = Signal(int, bool)
 
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
@@ -303,6 +307,8 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.componentGraph.playSignal.connect(self.emitPlaySignal)
         self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
+        self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
 
         self.catalogWidget = WaveformCatalogWidget()
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
@@ -310,6 +316,13 @@ class WorkspaceWidget(QWidget):
 
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
+
+    def emitSineStateChanged(self, keyIndex, isChecked):
+        self.sineStateChangedSignal.emit(keyIndex, isChecked)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
+
     def showComponentGraph(self, keyIndex:int):
         # Check if the centralGraph is currently in place
         item = self.gridLayout.itemAtPosition(0, 1)
@@ -409,9 +422,15 @@ class GenericGraphParametersWidget(QWidget):
         #self.setMinimumSize(self.parameterWidgetMinimumSize)
         self.setMaximumSize(QSize(250, 800))
 
+        self.durationSpin = QDoubleSpinBox()
+        self.durationSpin.setRange(1, 10)
+        self.durationSpin.setValue(3)
+        self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
+
         self.playButton.clicked.connect(self.playWaveform)
 
         self.controlLayout.addRow("Volume:", self.volumeSlider)
+        self.controlLayout.addRow("Duration:", self.durationSpin)
         self.controlLayout.addRow("", self.playButton)
 
     def playWaveform(self, event):
@@ -421,6 +440,8 @@ class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
     clearGraphSignal = Signal()
     frequencyChangedSignal = Signal(str, int, int)
+    sineStateChangedSignal = Signal(bool)
+
     def __init__(self):
         super().__init__()
 
@@ -429,27 +450,28 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.clearButton.setMaximumSize(self.parameterWidgetMaximumSize)
         self.clearButton.clicked.connect(self.clearGraphAndPoints)
 
-        self.durationSpin = QDoubleSpinBox()
-        self.durationSpin.setRange(1, 10)
-        self.durationSpin.setValue(3)
-        self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
-
 
         self.sineInterpolatorWidget = SineInterpolatorWidget()
+        self.sineInterpolatorWidget.setMinimumSize(self.parameterWidgetMinimumSize)
+        self.sineInterpolatorWidget.setMaximumSize(self.parameterWidgetMaximumSize)
         self.frequencyWidget = FrequencyWidget()
 
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
         self.controlLayout.addRow("Freq:", self.frequencyWidget)
-        self.controlLayout.addRow("Duration:", self.durationSpin)
         self.controlLayout.addRow("", self.clearButton)
         self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
-        self.controlLayout.setSpacing(4)
+        self.controlLayout.setSpacing(10)
         self.controlLayout.setContentsMargins(0, 0, 0, 0)
 
+        self.controlLayout.removeRow(1)
+
         # Slots and Signals
-        self.sineInterpolatorWidget.changedSignal.connect(self.graphPoints)
+        self.sineInterpolatorWidget.changedSignal.connect(self.emitSineStateChanged)
         self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
+
+    def emitSineStateChanged(self, isChecked):
+        self.sineStateChangedSignal.emit(isChecked)
 
     def emitFrequencyParameters(self, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(baseFreq, cents, octave)
@@ -460,8 +482,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.regraphSignal.emit()
 
     def clearGraphAndPoints(self, event):
-        print(event)
-        print(type(event))
+        self.clearGraphSignal.emit()
 
 class CentralGraphWidget(QWidget):
     playSignal = Signal(int)
@@ -486,8 +507,11 @@ class ComponentGraphWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
     playSignal = Signal(int)
     graphSignal = Signal(int)
+    clearGraphSignal = Signal(int)
+    regraphSignal = Signal(int)
     # Throw the index in as well 
     frequencyChangedSignal = Signal(int, str, int, int)
+    sineStateChangedSignal = Signal(int, bool)
 
     def __init__(self):
         super().__init__()
@@ -525,19 +549,28 @@ class ComponentGraphWidget(QWidget):
 
         self.graphParametersWidget = GraphParametersWidget()
         self.graphParametersWidget.regraphSignal.connect(self.graphPoints)
+        self.graphParametersWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.graphParametersWidget.playSignal.connect(self.emitPlaySignal)
         self.graphParametersWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.graphParametersWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
 
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
 
+    def emitSineStateChanged(self, isChecked:bool):
+        self.sineStateChangedSignal.emit(self.keyIndex, isChecked)
+
     def emitFrequencyParameters(self, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(self.keyIndex, baseFreq, cents, octave)
 
     def emitPlaySignal(self):
         self.playSignal.emit(self.keyIndex)
+
+    def emitClearGraphSignal(self):
+        self.clearGraph()
+        self.clearGraphSignal.emit(self.keyIndex)
 
     def setKeyIndex(self, keyIndex):
         self.keyIndex = keyIndex

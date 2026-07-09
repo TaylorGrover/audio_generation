@@ -16,7 +16,7 @@ $ pytest
 
 ## Sine Series of Random Points Over Equally-Spaced Intervals
 $$
-s=[s_1,...,s_n]
+s=[s_1,...,s_n],\quad s_k\in\left[-1,1\right\]
 $$
 ### Definitions
 $$
@@ -45,6 +45,23 @@ $$
 
 $$
 =\frac{2}{\lambda}\sum_{j=1}^n\left[-\frac{1}{\alpha_k}\left(\frac{m_j\lambda}{n}+s_j\right)\cos(\alpha_kb_j)+\frac{s_j}{\alpha_k}\cos(\alpha_ka_j)+\frac{m_j}{\alpha_k^2}\sin(\alpha_kb_j)-\frac{m_j}{\alpha_k^2}\sin(\alpha_ka_j)\right]
+$$
+
+### Cosine Series Coefficients
+Through similar means as above, the cosine series coefficients are 
+
+$$
+A_k
+$$
+
+$$
+=\frac{2}{\lambda}\sum_{j=1}^n\left[\frac{1}{\alpha_k}\left(\frac{m_j\lambda}{n}+s_j\right)\sin(\alpha_kb_j)-\frac{s_j}{\alpha_k}\sin(\alpha_ka_j)+\frac{m_j}{\alpha_k^2}\cos(\alpha_kb_j)-\frac{m_j}{\alpha_k^2}\cos(\alpha_ka_j)\right\]
+$$
+
+The additional term $A_0$ has the following expression:
+
+$$
+A_0 = \frac{2}{\lambda}\sum_{j=1}^n\left[\frac{m_jb_j^2}{2}-m_ja_jb_j+s_jb_j-\frac{m_ja_j^2}{2}+m_ja_j^2-s_ja_j\right]
 $$
 
 ## Wave Table

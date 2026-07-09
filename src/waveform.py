@@ -36,21 +36,25 @@ def _build_note_map():
         note_map |= dict(zip(numbered_letters, indices))
     return note_map
 
-def seeded_waveform(vol, duration, hz, seed, sr, sine_count=100):
+def seeded_waveform(vol, duration, hz, seed, sr, sine_count=13):
     t = np.linspace(0, duration, int(sr * duration))
     wavelength = 1.0 / hz
-    coefficients = np.zeros(sine_count)
+    sine_coefficients = np.zeros(sine_count)
+    cosine_coefficients = np.zeros(sine_count + 1)
     n_points = len(seed) - 1
     ms = (seed[1:] - seed[:-1]) * n_points / wavelength
     js = np.array([i for i in range(1, n_points + 1)])
     lowers = (js - 1) * wavelength / n_points
     uppers = js * wavelength / n_points
-    wave = np.zeros_like(t)
+    cosine_coefficients[0] = 2 / wavelength * np.sum(ms * uppers ** 2 / 2 - ms * lowers * uppers + seed[:-1] * uppers - ms * lowers ** 2 / 2 + ms * lowers ** 2 - seed[:-1] * lowers)
+    wave = cosine_coefficients[0] * np.ones_like(t)
     for k in range(1, sine_count + 1):
         alpha_k = 2 * np.pi * k / wavelength
-        segments = -(ms * wavelength / (alpha_k * n_points) + seed[:-1] / alpha_k) * np.cos(alpha_k * uppers) + seed[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
-        coefficients[k - 1] = 2 / wavelength * np.sum(segments)
-        wave += coefficients[k - 1] * np.sin(alpha_k * t)
+        sine_segments = -(ms * wavelength / n_points + seed[:-1]) * np.cos(alpha_k * uppers) / alpha_k + seed[:-1] / alpha_k * np.cos(alpha_k * lowers) + ms / alpha_k ** 2 * np.sin(alpha_k * uppers) - ms / alpha_k ** 2 * np.sin(alpha_k * lowers)
+        cosine_segments = (ms * wavelength / n_points + seed[:-1]) * np.sin(alpha_k * uppers) / alpha_k - seed[:-1] / alpha_k * np.sin(alpha_k * lowers) + ms / alpha_k ** 2 * np.cos(alpha_k * uppers) - ms / alpha_k ** 2 * np.cos(alpha_k * lowers)
+        sine_coefficients[k - 1] = 2 / wavelength * np.sum(sine_segments)
+        cosine_coefficients[k] = 2 / wavelength * np.sum(cosine_segments)
+        wave += sine_coefficients[k - 1] * np.sin(alpha_k * t) + cosine_coefficients[k] * np.cos(alpha_k * t)
     wave = vol * wave / np.max(np.abs(wave))
     return vol * np.array([wave, wave]).T
 
