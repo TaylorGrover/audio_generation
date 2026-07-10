@@ -26,6 +26,7 @@ class WaveView(QMainWindow):
     frequencyChangedSignal = Signal(int, str, int, int)
     clearGraphSignal = Signal(int)
     sineStateChangedSignal = Signal(int, bool)
+    durationChangedSignal = Signal(float)
 
     def __init__(self):
         super().__init__()
@@ -50,6 +51,16 @@ class WaveView(QMainWindow):
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
         self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.workspaceWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
+        self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
+
+    def setDurationWidgetValue(self, duration:float):
+        self.workspaceWidget.setDurationWidgetValue(duration)
+
+    def emitDurationChanged(self, duration: float):
+        self.durationChangedSignal.emit(duration)
+
+    def setStopTimer(self, duration:float):
+        self.workspaceWidget.setStopTimer(duration)
 
     def emitSineStateChanged(self, keyIndex, isChecked):
         self.sineStateChangedSignal.emit(keyIndex, isChecked)
@@ -290,6 +301,7 @@ class WorkspaceWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
     frequencyChangedSignal = Signal(int, str, int, int)
     sineStateChangedSignal = Signal(int, bool)
+    durationChangedSignal = Signal(float)
 
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
@@ -303,19 +315,32 @@ class WorkspaceWidget(QWidget):
         self.componentGraph = ComponentGraphWidget()
         self.centralGraph = CentralGraphWidget()
 
-        self.centralGraph.playSignal.connect(self.emitPlaySignal)
-        self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
-        self.componentGraph.playSignal.connect(self.emitPlaySignal)
-        self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
-        self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
-        self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
-
         self.catalogWidget = WaveformCatalogWidget()
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
         self.gridLayout.addWidget(self.centralGraph, 0, 1)
 
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
+
+        self.centralGraph.playSignal.connect(self.emitPlaySignal)
+        self.centralGraph.durationChangedSignal.connect(self.emitDurationChanged)
+
+        self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
+        self.componentGraph.playSignal.connect(self.emitPlaySignal)
+        self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
+        self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
+
+    
+    def emitDurationChanged(self, duration:float):
+        self.durationChangedSignal.emit(duration)
+
+    def setDurationWidgetValue(self, duration:float):
+        self.centralGraph.setDurationWidgetValue(duration)
+
+    def setStopTimer(self, duration:float):
+        self.componentGraph.setStopTimer(duration)
+        self.centralGraph.setStopTimer(duration)
 
     def emitSineStateChanged(self, keyIndex, isChecked):
         self.sineStateChangedSignal.emit(keyIndex, isChecked)
@@ -407,9 +432,11 @@ class WaveformCatalogWidget(QWidget):
 class GenericGraphParametersWidget(QWidget):
     # Contains the index of the waveform
     playSignal = Signal(int)
+    durationChangedSignal = Signal(float)
 
     def __init__(self):
         super().__init__()
+        self.isPlaying = False
         self.controlLayout = QFormLayout(self)
         self.parameterWidgetMaximumSize = QSize(350, 700)
         self.parameterWidgetMinimumSize = QSize(30, 30)
@@ -426,15 +453,34 @@ class GenericGraphParametersWidget(QWidget):
         self.durationSpin.setRange(1, 10)
         self.durationSpin.setValue(3)
         self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
+        self.durationSpin.valueChanged.connect(self.emitDurationChanged)
 
         self.playButton.clicked.connect(self.playWaveform)
 
         self.controlLayout.addRow("Volume:", self.volumeSlider)
         self.controlLayout.addRow("Duration:", self.durationSpin)
         self.controlLayout.addRow("", self.playButton)
+    
+    def setDurationWidgetValue(self, duration: float):
+        self.durationSpin.setValue(duration)
+
+    def emitDurationChanged(self):
+        self.durationChangedSignal.emit(self.durationSpin.value())
 
     def playWaveform(self, event):
         self.playSignal.emit(0)
+
+    def setStopTimer(self, duration:float):
+        self.playTimer = QTimer()
+        self.playTimer.timeout.connect(self.resetPlayButton)
+        self.playTimer.start(int(duration * 1000))
+        self.playButton.setText("Stop")
+        self.playButton.clicked.connect(self.resetPlayButton)
+    
+    def resetPlayButton(self):
+        self.playButton.setText("Play")
+        self.stopAudioSignal.emit()
+        self.playButton.clicked.connect(self.playWaveform)
 
 class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
@@ -488,6 +534,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
 class CentralGraphWidget(QWidget):
     playSignal = Signal(int)
+    durationChangedSignal = Signal(float)
 
     def __init__(self):
         super().__init__()
@@ -504,6 +551,18 @@ class CentralGraphWidget(QWidget):
         
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
+
+        self.graphParametersWidget.durationChangedSignal.connect(self.emitDurationChanged)
+
+    def setDurationWidgetValue(self, duration: float):
+        self.graphParametersWidget.setDurationWidgetValue(duration)
+
+    def emitDurationChanged(self, duration):
+        self.durationChangedSignal.emit(duration)
+
+    def setStopTimer(self, duration:float):
+        self.graphParametersWidget.setStopTimer(duration)
+
 
 class ComponentGraphWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
@@ -560,6 +619,9 @@ class ComponentGraphWidget(QWidget):
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def setStopTimer(self, duration:float):
+        self.graphParametersWidget.setStopTimer(duration)
 
     def emitSineStateChanged(self, isChecked:bool):
         self.sineStateChangedSignal.emit(self.keyIndex, isChecked)

@@ -9,14 +9,17 @@ class WaveModel:
         self.point_key_str = "points"
         self.name_key_str = "name"
         self.linear_interp_str = "linear_interp"
+        self.linear_extrap_str = "linear_extrap"
         self.sine_interp_str = "sine_interp"
+        self.sine_extrap_str = "sine_extrap"
         self.freq_str = "frequency"
         self.amp_str = "amplitude"
         self.sine_count_str = "sine_count"
         self.sine_checked_str = "sine_checked"
         self.duration = 5
-        self.sample_rate = 44100
+        self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
+        self.combined_wave = np.zeros_like(self.t)
 
     def createEmptyWave(self, key_index:int, name:str):
         self.waveDict[key_index] = {
@@ -24,6 +27,8 @@ class WaveModel:
             , self.point_key_str: []
             , self.linear_interp_str: np.array([[]])
             , self.sine_interp_str: np.array([])
+            , self.sine_extrap_str: np.array([])
+            , self.linear_extrap_str: np.array([])
             , self.amp_str: 1.0
             , self.freq_str: waveform.F
             , self.sine_count_str: 13
@@ -99,6 +104,10 @@ class WaveModel:
     def updateFrequency(self, key, baseFreq, cents, octave):
         self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
 
+    def updateDuration(self, duration:float):
+        self.duration = duration
+        self.calculateCombinedWave(recalculate=True, norm=True)
+
     def getFrequency(self, key):
         return self.waveDict[key][self.freq_str]
 
@@ -115,17 +124,20 @@ class WaveModel:
     def getSineChecked(self, key):
         return self.waveDict[key][self.sine_checked_str]
 
+    def getSampleRate(self):
+        return self.sample_rate
+
     def getWave(self, key:int):
         """
         Generate wave based on checked status
         """
         if self.waveDict[key][self.sine_checked_str]:
-            wave = self.getSineExtrapolatedWave(key)
+            wave = self.getSineExtrapolatedWave(key, recalculate=True)
         else:
-            wave = self.getExtrapolatedWave(key)
+            wave = self.getExtrapolatedWave(key, recalculate=True)
         return wave
 
-    def getExtrapolatedWave(self, key):
+    def calculateExtrapolatedWave(self, key):
         wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
         total_sample_count = int(self.duration * self.sample_rate)
         x, y = self.getInterpolatedXY(key)
@@ -135,18 +147,42 @@ class WaveModel:
         y_interp = np.interp(t_base, x, y)
         y_interp /= np.max(np.abs(y_interp), axis=0)
         wave = self.getAmplitude(key) * y_interp[t_modulo]
-        return wave
+        self.waveDict[key][self.linear_extrap_str] = wave
 
-    def getSineExtrapolatedWave(self, key):
+    def getExtrapolatedWave(self, key, recalculate=False):
+        if recalculate:
+            self.calculateExtrapolatedWave(key)
+        return self.waveDict[key][self.linear_extrap_str]
+
+    def calculateSineExtrapolatedWave(self, key):
         volume = self.getAmplitude(key)
         frequency = self.getFrequency(key)
         sine_count = self.getSineCount(key)
         x, y = self.getInterpolatedXY(key)
         wave = volume * waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count)
-        return wave
+        self.waveDict[key][self.sine_extrap_str] = wave
 
+    def getSineExtrapolatedWave(self, key, recalculate=False):
+        if recalculate:
+            self.calculateSineExtrapolatedWave(key)
+        return self.waveDict[key][self.sine_extrap_str]
+
+    def calculateCombinedWave(self, recalculate=False, norm=True):
+        for keyIndex in self.waveDict:
+            if recalculate:
+                self.calculateExtrapolatedWave(keyIndex)
+                self.calculateSineExtrapolatedWave(keyIndex)
+            if self.waveDict[keyIndex][self.sine_checked_str]:
+                self.combined_wave += self.getSineExtrapolatedWave(keyIndex, False)
+            else:
+                self.combined_wave += self.getExtrapolatedWave(keyIndex, False)
+        if norm:
+            max_value = np.max(np.abs(self.combined_wave), axis=0)
+            if max_value > 0:
+                self.combined_wave /= max_value
+        
     def getCombinedWave(self, norm=True):
-        return np.zeros_like(self.t)
+        return self.combined_wave
 
 class Project:
     def __init__(self, project_name:str):

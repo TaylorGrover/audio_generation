@@ -1,9 +1,19 @@
 from action_monitor import ActionMonitor
+import multiprocessing
+import numpy as np
 import playsound
 import utilities
 import waveform
 if utilities.getOS() == "windows":
     import winsound
+
+def playSoundProcess(path):
+    operating_system = utilities.getOS()
+    if operating_system == "windows":
+        winsound.PlaySound(path, winsound.SND_ASYNC)
+    elif operating_system == "linux":
+        pass
+        #playsound.playsound(path, block=False)
 
 """
 This is the interface between GUI and wave data model.
@@ -23,6 +33,13 @@ class WaveController:
         self.keyIndexCounter = 1
         self.view = view 
         self.model = model
+        self.isPlaying = False
+
+        # Initialize a temporary wave effect
+        self.effect = waveform.play(np.zeros(int(self.model.getDuration()*self.model.getSampleRate())), sr=self.model.getSampleRate())
+
+        # Set the view's duration button based on the model
+        self.view.setDurationWidgetValue(self.model.getDuration())
 
         # TODO: Decide between initializing the model parameters based on the view defaults or vice versa.
         
@@ -41,7 +58,6 @@ class WaveController:
         # TODO: Finish implementing this
         self.view.initiateCatalogAdditionSignal.connect(self.openCatalogAdditionDialog)
         self.view.createCatalogWaveSignal.connect(self.createCatalogWave)
-        
 
         # TODO: Delete a wave from the catalog
 
@@ -73,7 +89,7 @@ class WaveController:
         self.view.frequencyChangedSignal.connect(self.updateFrequency)
 
         # TODO: Change duration of global waveform
-
+        self.view.durationChangedSignal.connect(self.updateDuration)
         # TODO: Clear component waveform
         self.view.clearGraphSignal.connect(self.clearGraphPoints)
 
@@ -99,21 +115,31 @@ class WaveController:
     def updateSineInterpolationChecked(self, key:int, isChecked:bool):
         self.model.updateSineInterpolationChecked(key, isChecked)
 
+    def updateDuration(self, duration:float):
+        self.model.updateDuration(duration)
+
     def playCurrentWaveform(self, key):
-        operating_system = utilities.getOS()
         if key == 0: # This might be bad design, but the zero index is the global view
             wave = self.model.getCombinedWave()
         else:
             wave = self.model.getWave(key)
-            path = waveform.generateWaveFilepath()
+            self.effect = waveform.play(wave)
+            self.effect.play()
+            '''path = waveform.generateWaveFilepath()
             print(path)
             waveform.saveWavFile(path, wave, self.model.sample_rate)
-            if operating_system == "windows":
-                winsound.PlaySound(path, winsound.SND_ASYNC)
-            elif operating_system == "linux":
-                whatisit = playsound.playsound(path, block=False)
-                print(whatisit)
-                print(type(whatisit))
+            duration = self.model.getDuration()
+            self.view.setStopTimer(duration)'''
+        self.proc = multiprocessing.Process(target=self.playSoundProcess, args=(wave,))
+        self.proc.start()
+
+    def playSoundProcess(self, wave):
+        self.effect = waveform.play(wave)
+        self.effect.play()
+
+    def stopAudio(self):
+        if hasattr(self, "proc"):
+            self.proc.terminate()
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)
