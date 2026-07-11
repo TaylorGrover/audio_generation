@@ -12,8 +12,7 @@ def playSoundProcess(path):
     if operating_system == "windows":
         winsound.PlaySound(path, winsound.SND_ASYNC)
     elif operating_system == "linux":
-        pass
-        #playsound.playsound(path, block=False)
+        playsound.playsound(path, block=False)
 
 """
 This is the interface between GUI and wave data model.
@@ -140,8 +139,11 @@ class WaveController:
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
                 self.wave = self.model.getWave(key, recalculate=True)
-                self.effect = waveform.play(self.wave, sr=self.model.getSampleRate())
-                self.effect.play()
+                path = waveform.generateWaveFilepath()
+                waveform.saveWavFile(path, self.wave, self.model.getSampleRate())
+                playSoundProcess(path)
+                #self.effect = waveform.play(self.wave, sr=self.model.getSampleRate())
+                #self.effect.play()
             '''path = waveform.generateWaveFilepath()
             print(path)
             waveform.saveWavFile(path, wave, self.model.sample_rate)

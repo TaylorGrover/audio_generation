@@ -32,7 +32,9 @@ class WaveView(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        
+
+        self.wave = np.zeros(48000)
+        self.effect = waveform.play(self.wave)
         toolBar = QToolBar()
         self.addToolBar(toolBar)
         fileMenu = self.menuBar().addMenu("&File")

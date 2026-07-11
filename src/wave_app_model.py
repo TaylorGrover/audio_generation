@@ -166,7 +166,6 @@ class WaveModel:
 
     def getFrequency(self, key):
         freq = self.waveDict[key][self.freq_str]
-        print(freq)
         return freq
 
     def getDuration(self):
