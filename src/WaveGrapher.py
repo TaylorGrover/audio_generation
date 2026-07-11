@@ -18,16 +18,16 @@ class WaveView(QMainWindow):
     undoSignal = Signal(int)
     redoSignal = Signal(int)
 
-    initiateCatalogAdditionSignal = Signal(int)
-    createCatalogWaveSignal = Signal(str)
-    playSignal = Signal(int)
-    graphSignal = Signal(int) # Emits the key for the specific graph to redraw
-    pointAdditionSignal = Signal(int, float, float)
-    frequencyChangedSignal = Signal(int, str, int, int)
     clearGraphSignal = Signal(int)
-    sineStateChangedSignal = Signal(int, bool)
-    sineCountChangedSignal = Signal(int, int)
+    createCatalogWaveSignal = Signal(str)
     durationChangedSignal = Signal(float)
+    frequencyChangedSignal = Signal(int, str, int, int)
+    graphSignal = Signal(int) # Emits the key for the specific graph to redraw
+    initiateCatalogAdditionSignal = Signal(int)
+    playSignal = Signal(int)
+    pointAdditionSignal = Signal(int, float, float)
+    sineCountChangedSignal = Signal(int, int)
+    sineStateChangedSignal = Signal(int, bool)
     volumeUpdateSignal = Signal(int, float)
 
     def __init__(self):
@@ -345,6 +345,8 @@ class WorkspaceWidget(QWidget):
 
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
+        self.catalogWidget.switchToMainSignal.connect(self.showCentralGraph)
+        self.catalogWidget.switchToComponentSignal.connect(self.switchToComponentGraph)
 
         self.centralGraph.playSignal.connect(self.emitPlaySignal)
         self.centralGraph.durationChangedSignal.connect(self.emitDurationChanged)
@@ -363,8 +365,26 @@ class WorkspaceWidget(QWidget):
     def emitDurationChanged(self, duration:float):
         self.durationChangedSignal.emit(duration)
 
+    def showCentralGraph(self):
+        item = self.gridLayout.itemAtPosition(0, 1)
+        widget = item.widget()
+        if widget == self.componentGraph:
+            self.gridLayout.removeWidget(widget)
+            widget.hide()
+            self.gridLayout.addWidget(self.centralGraph, 0, 1)
+            self.centralGraph.setVisible(True)
+            self.catalogWidget.setToggleComponentButton()
+
     def setDurationWidgetValue(self, duration:float):
         self.centralGraph.setDurationWidgetValue(duration)
+
+    def switchToComponentGraph(self):
+        """
+        This is a wrapper for showComponentGraph for the signal. 
+        It just switches back to the most recent component graph 
+        index available 
+        """
+        self.showComponentGraph(self.componentGraph.getKeyIndex())
 
     def setStopTimer(self, duration:float):
         self.componentGraph.setStopTimer(duration)
@@ -388,6 +408,8 @@ class WorkspaceWidget(QWidget):
             widget.hide()
             self.componentGraph.setKeyIndex(keyIndex)
             self.gridLayout.addWidget(self.componentGraph, 0, 1)
+            self.componentGraph.setVisible(True)
+            self.catalogWidget.setToggleMainButton()
 
     def displayDupNameErrMsg(self):
         self.waveformNameInputWidget.displayDupNameErrMsg()
@@ -433,6 +455,8 @@ class WaveformCatalogWidget(QWidget):
     """
     initiateCatalogAdditionSignal = Signal(bool)
     swapGraphSignal = Signal(int)
+    switchToMainSignal = Signal()
+    switchToComponentSignal = Signal()
 
     def __init__(self):
         super().__init__()
@@ -443,13 +467,33 @@ class WaveformCatalogWidget(QWidget):
         self.catalogVBox = QVBoxLayout(self.catalogSection)
         self.addWaveButton = QPushButton("+")
         self.addWaveButton.setMaximumSize(QSize(100, 100))
-        self.addWaveButton.clicked.connect(self.emitInititateAddCatalogWave)
+        self.toggleGraphButton = QPushButton("Component")
+
+        self.vboxLayout.addWidget(self.toggleGraphButton)
         self.vboxLayout.addWidget(self.catalogSection)
         self.vboxLayout.addWidget(self.addWaveButton)
         self.vboxLayout.addStretch()
 
+        # Signals 
+        self.addWaveButton.clicked.connect(self.emitInititateAddCatalogWave)
+        self.toggleGraphButton.clicked.connect(self.emitSwitchToMainGraph)
+    
     def emitInititateAddCatalogWave(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
+
+    def emitSwitchToMainGraph(self):
+        self.switchToMainSignal.emit()
+
+    def emitSwitchToComponentGraph(self):
+        self.switchToComponentSignal.emit()
+
+    def setToggleMainButton(self):
+        self.toggleGraphButton.setText("Main")
+        self.toggleGraphButton.clicked.connect(self.emitSwitchToMainGraph)
+
+    def setToggleComponentButton(self):
+        self.toggleGraphButton.setText("Component")
+        self.toggleGraphButton.clicked.connect(self.emitSwitchToComponentGraph)
 
     def addWaveWidgetToCatalog(self, key_index, name:str):
         self.labeledWavesDict[key_index] = {
@@ -664,6 +708,9 @@ class ComponentGraphWidget(QWidget):
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def getKeyIndex(self):
+        return self.keyIndex
 
     def setStopTimer(self, duration:float):
         self.graphParametersWidget.setStopTimer(duration)
