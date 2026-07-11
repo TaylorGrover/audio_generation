@@ -140,7 +140,7 @@ class WaveController:
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
                 self.wave = self.model.getWave(key, recalculate=True)
-                self.effect = waveform.play(self.wave)
+                self.effect = waveform.play(self.wave, sr=self.model.getSampleRate())
                 self.effect.play()
             '''path = waveform.generateWaveFilepath()
             print(path)
