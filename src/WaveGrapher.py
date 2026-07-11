@@ -28,6 +28,7 @@ class WaveView(QMainWindow):
     sineStateChangedSignal = Signal(int, bool)
     sineCountChangedSignal = Signal(int, int)
     durationChangedSignal = Signal(float)
+    volumeUpdateSignal = Signal(int, float)
 
     def __init__(self):
         super().__init__()
@@ -54,9 +55,13 @@ class WaveView(QMainWindow):
         self.workspaceWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.workspaceWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
+        self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
 
     def setDurationWidgetValue(self, duration:float):
         self.workspaceWidget.setDurationWidgetValue(duration)
+
+    def emitVolumeChanged(self, keyIndex:int, vol:float):
+        self.volumeUpdateSignal.emit(keyIndex, vol)
 
     def emitDurationChanged(self, duration: float):
         self.durationChangedSignal.emit(duration)
@@ -182,6 +187,7 @@ class WaveView(QMainWindow):
         event.accept()
 
 class VolumeControlsWidget(QWidget):
+    volumeUpdateSignal = Signal(float)
     def __init__(self):
         super().__init__()
         self.layout = QHBoxLayout(self)
@@ -194,8 +200,13 @@ class VolumeControlsWidget(QWidget):
         self.layout.addWidget(self.volumeSlider)
         self.layout.addStretch()
 
+        self.volumeSlider.sliderReleased.connect(self.emitVolume)
+
     def getVolume(self):
         return self.volumeSlider.value() / 10.0
+
+    def emitVolume(self):
+        self.volumeUpdateSignal.emit(self.getVolume())
 
 class SineInterpolatorWidget(QWidget):
     changedSignal = Signal(bool)
@@ -312,6 +323,7 @@ class WorkspaceWidget(QWidget):
     sineStateChangedSignal = Signal(int, bool)
     sineCountChangedSignal = Signal(int, int)
     durationChangedSignal = Signal(float)
+    volumeUpdateSignal = Signal(int, float)
 
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
@@ -341,6 +353,10 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
+        self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
+
+    def emitVolume(self, key:int, vol:float):
+        self.volumeUpdateSignal.emit(key, vol)
     
     def emitDurationChanged(self, duration:float):
         self.durationChangedSignal.emit(duration)
@@ -446,6 +462,7 @@ class GenericGraphParametersWidget(QWidget):
     # Contains the index of the waveform
     playSignal = Signal(int)
     durationChangedSignal = Signal(float)
+    volumeUpdateSignal = Signal(float)
 
     def __init__(self):
         super().__init__()
@@ -469,6 +486,7 @@ class GenericGraphParametersWidget(QWidget):
         self.durationSpin.valueChanged.connect(self.emitDurationChanged)
 
         self.playButton.clicked.connect(self.playWaveform)
+        self.volumeSlider.volumeUpdateSignal.connect(self.emitVolume)
 
         self.controlLayout.addRow("Volume:", self.volumeSlider)
         self.controlLayout.addRow("Duration:", self.durationSpin)
@@ -479,6 +497,9 @@ class GenericGraphParametersWidget(QWidget):
 
     def emitDurationChanged(self):
         self.durationChangedSignal.emit(self.durationSpin.value())
+
+    def emitVolume(self, vol:float):
+        self.volumeUpdateSignal.emit(vol)
 
     def playWaveform(self, event):
         self.playSignal.emit(0)
@@ -591,6 +612,7 @@ class ComponentGraphWidget(QWidget):
     frequencyChangedSignal = Signal(int, str, int, int)
     sineStateChangedSignal = Signal(int, bool)
     sineCountChangedSignal = Signal(int, int)
+    volumeUpdateSignal = Signal(int, float)
 
     def __init__(self):
         super().__init__()
@@ -634,6 +656,7 @@ class ComponentGraphWidget(QWidget):
         self.graphParametersWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
         self.graphParametersWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.graphParametersWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
+        self.graphParametersWidget.volumeUpdateSignal.connect(self.emitVolume)
 
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
@@ -642,6 +665,9 @@ class ComponentGraphWidget(QWidget):
 
     def setStopTimer(self, duration:float):
         self.graphParametersWidget.setStopTimer(duration)
+
+    def emitVolume(self, vol:float):
+        self.volumeUpdateSignal.emit(self.keyIndex, vol)
 
     def emitSineCountChanged(self, count):
         self.sineCountChangedSignal.emit(self.keyIndex, count)

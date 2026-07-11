@@ -33,7 +33,7 @@ class WaveModel:
             , self.linear_extrap_str: np.array([])
             , self.amp_str: 1.0
             , self.freq_str: waveform.F
-            , self.sine_count_str: 13
+            , self.sine_count_str: 8
             , self.sine_checked_str: True
         }
 
@@ -92,15 +92,27 @@ class WaveModel:
     def clearGraphPoints(self, keyIndex):
         self.subtractWaveFromCombined(keyIndex)
         self.waveDict[keyIndex][self.point_key_str] = []
-        self.waveDict[keyIndex][self.linear_interp_str] = np.array([[]])
-        self.waveDict[keyIndex][self.sine_interp_str] = np.array([])
-        self.waveDict[keyIndex][self.sine_extrap_str] = np.array([])
-        self.waveDict[keyIndex][self.linear_extrap_str] = np.array([])
+        self.waveDict[keyIndex][self.linear_interp_str] *= 0
+        self.waveDict[keyIndex][self.sine_interp_str] *= 0
+        self.waveDict[keyIndex][self.sine_extrap_str] *= 0
+        self.waveDict[keyIndex][self.linear_extrap_str] *= 0
 
 
     def subtractWaveFromCombined(self, keyIndex):
         subtracting_wave = self.getWave(keyIndex)
         self.combined_wave -= subtracting_wave
+
+    def updateVolume(self, key:int, vol:float):
+        """
+        TODO: Ensure this isn't needlessly expensive
+        """
+        current_vol = self.getAmplitude(key)
+        self.waveDict[key][self.amp_str] = vol
+        if current_vol > 0:
+            self.waveDict[key][self.sine_extrap_str] *= vol / current_vol
+        else:
+            # Just using this to decide which one to recalculate
+            self.getWave(key, recalculate=True)
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)

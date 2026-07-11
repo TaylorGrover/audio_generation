@@ -87,6 +87,7 @@ class WaveController:
         # TODO: Remove a frequency envelope from a component oscillator in the synthesizing workspace. Referenced by indexes for envelope and oscillator 
 
         # TODO: Adjust volume for component oscillator
+        self.view.volumeUpdateSignal.connect(self.updateVolume)
 
         # TODO: Change point position for component oscillator
 
@@ -112,6 +113,9 @@ class WaveController:
         # Button shortcuts
         #self.actionMonitor = actionMonitor
     
+    def updateVolume(self, keyIndex:int, vol:float):
+        self.model.updateVolume(keyIndex, vol)
+    
     def openCatalogAdditionDialog(self, event):
         """
         Add a wave graph to the catalogSection vbox
@@ -123,8 +127,8 @@ class WaveController:
         self.model.updateSineInterpolationChecked(key, isChecked)
 
     def updateSineCount(self, key:int, count:int):
-        print(count)
         self.model.updateSineCount(key, count)
+        self.graphComponentWaveform(key)
 
     def updateDuration(self, duration:float):
         self.model.updateDuration(duration)
