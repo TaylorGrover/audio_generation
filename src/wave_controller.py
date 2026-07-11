@@ -71,6 +71,9 @@ class WaveController:
         # TODO: Check or uncheck sine interpolation
         self.view.sineStateChangedSignal.connect(self.updateSineInterpolationChecked)
 
+        # TODO: Update sine count for a component wave
+        self.view.sineCountChangedSignal.connect(self.updateSineCount)
+
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
         # TODO: Remove a catalog wave from the component list of the synthesizing workspace
@@ -119,6 +122,10 @@ class WaveController:
     def updateSineInterpolationChecked(self, key:int, isChecked:bool):
         self.model.updateSineInterpolationChecked(key, isChecked)
 
+    def updateSineCount(self, key:int, count:int):
+        print(count)
+        self.model.updateSineCount(key, count)
+
     def updateDuration(self, duration:float):
         self.model.updateDuration(duration)
 
@@ -128,7 +135,7 @@ class WaveController:
         else:
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
-                self.wave = self.model.getWave(key)
+                self.wave = self.model.getWave(key, recalculate=True)
                 self.effect = waveform.play(self.wave)
                 self.effect.play()
             '''path = waveform.generateWaveFilepath()
@@ -138,10 +145,6 @@ class WaveController:
             self.view.setStopTimer(duration)'''
         #self.proc = multiprocessing.Process(target=self.playSoundProcess, args=(wave,))
         #self.proc.start()
-
-    def playSoundProcess(self, wave):
-        self.effect = waveform.play(wave)
-        self.effect.play()
 
     def stopAudio(self):
         if hasattr(self, "proc"):

@@ -1,4 +1,5 @@
 import bisect
+import copy
 import numpy as np
 from scipy.interpolate import CubicSpline
 import waveform
@@ -20,6 +21,7 @@ class WaveModel:
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
         self.combined_wave = np.zeros_like(self.t)
+        self.isPreviouslyCombined = False
 
     def createEmptyWave(self, key_index:int, name:str):
         self.waveDict[key_index] = {
@@ -43,6 +45,9 @@ class WaveModel:
     def hasKey(self, key:int) -> bool:
         return key in self.waveDict
 
+    def getChecked(self, key:int) -> bool:
+        return self.waveDict[key][self.sine_checked_str]
+
     def getPoints(self, key):
         return self.waveDict[key][self.point_key_str]
 
@@ -64,13 +69,25 @@ class WaveModel:
     def addPoint(self, key, x, y):
         """
         Add a new point to a component waveform.  
-        TODO: Fix update sine interpolation
+        TODO: Very likely to cause problems. Should be tested
+        thoroughly to minimize nihilism.
+        Note: Boolean "isPreviouslyCombined" is used to track if 
+        the global wave has ever been updated from zeros. If yes,
+        remove the current component referenced by the before altering
+        it and adding it back.
         """
         if self.hasKey(key):
             bisect.insort(self.waveDict[key][self.point_key_str], [x, y], key=lambda t: t[0])
             if self.getPointCount(key) >= 2:
                 self.updateLinearInterpolation(key)
                 self.updateSineInterpolation(key)
+                if self.isPreviouslyCombined:
+                    self.subtractWaveFromCombined(key)
+                else:
+                    self.isPreviouslyCombined = True    
+                wave = self.getWave(key, recalculate=True)
+                self.combined_wave += wave
+
 
     def clearGraphPoints(self, keyIndex):
         self.subtractWaveFromCombined(keyIndex)
@@ -82,7 +99,8 @@ class WaveModel:
 
 
     def subtractWaveFromCombined(self, keyIndex):
-
+        subtracting_wave = self.getWave(keyIndex)
+        self.combined_wave -= subtracting_wave
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
@@ -93,18 +111,31 @@ class WaveModel:
     def updateSineInterpolationChecked(self, key:int, isChecked):
         self.waveDict[key][self.sine_checked_str] = isChecked
 
+    def updateSineCount(self, key:int, count:int):
+        # Only add back to the combined wave if currently a sine wave
+        isChecked = self.getChecked(key)
+        if isChecked:
+            component = copy.copy(self.getSineExtrapolatedWave(key, recalculate=False))
+            self.combined_wave -= component
+        self.waveDict[key][self.sine_count_str] = count
+        self.updateSineInterpolation(key)
+        self.calculateSineExtrapolatedWave(key)
+        if isChecked:
+            self.combined_wave += self.getSineExtrapolatedWave(key)
+
     def updateSineInterpolation(self, key:int):
         x, y = self.getInterpolatedXY(key)
         duration = x[-1] - x[0]
         sine_time = np.linspace(x[0], x[-1], int(duration * self.sample_rate))
         amplitude = np.max(np.abs(y))
+        sine_count = self.getSineCount(key)
         wave = waveform.seeded_waveform(
             amplitude
             , duration
             , 1.0 / duration
             , y
             , self.sample_rate
-            , sine_count=13 # TODO: Fix this 
+            , sine_count=sine_count
         ).T[0]
         self.waveDict[key][self.sine_interp_str] = np.array([sine_time, wave])
 
@@ -113,7 +144,13 @@ class WaveModel:
 
     def updateDuration(self, duration:float):
         self.duration = duration
+        self.combined_wave = np.zeros(int(duration * self.sample_rate))
         self.calculateCombinedWave(recalculate=True, norm=True)
+
+    def updateComponentDurations(self, duration:float):
+        """
+
+        """
 
     def getFrequency(self, key):
         return self.waveDict[key][self.freq_str]
@@ -134,14 +171,14 @@ class WaveModel:
     def getSampleRate(self):
         return self.sample_rate
 
-    def getWave(self, key:int):
+    def getWave(self, key:int, recalculate=False):
         """
         Generate wave based on checked status
         """
         if self.waveDict[key][self.sine_checked_str]:
-            wave = self.getSineExtrapolatedWave(key, recalculate=True)
+            wave = self.getSineExtrapolatedWave(key, recalculate=recalculate)
         else:
-            wave = self.getExtrapolatedWave(key, recalculate=True)
+            wave = self.getExtrapolatedWave(key, recalculate=recalculate)
         return wave
 
     def calculateExtrapolatedWave(self, key):
@@ -157,6 +194,9 @@ class WaveModel:
         self.waveDict[key][self.linear_extrap_str] = wave
 
     def getExtrapolatedWave(self, key, recalculate=False):
+        """ 
+        The linearly interpolated wave that is actually heard
+        """
         if recalculate:
             self.calculateExtrapolatedWave(key)
         return self.waveDict[key][self.linear_extrap_str]
@@ -166,10 +206,13 @@ class WaveModel:
         frequency = self.getFrequency(key)
         sine_count = self.getSineCount(key)
         x, y = self.getInterpolatedXY(key)
-        wave = volume * waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count)
+        wave = volume * waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
         self.waveDict[key][self.sine_extrap_str] = wave
 
     def getSineExtrapolatedWave(self, key, recalculate=False):
+        """
+        The sine wave that is actually heard
+        """
         if recalculate:
             self.calculateSineExtrapolatedWave(key)
         return self.waveDict[key][self.sine_extrap_str]
@@ -183,10 +226,6 @@ class WaveModel:
                 self.combined_wave += self.getSineExtrapolatedWave(keyIndex, False)
             else:
                 self.combined_wave += self.getExtrapolatedWave(keyIndex, False)
-        if norm:
-            max_value = np.max(np.abs(self.combined_wave), axis=0)
-            if max_value > 0:
-                self.combined_wave /= max_value
         
     def getCombinedWave(self):
         return self.combined_wave
