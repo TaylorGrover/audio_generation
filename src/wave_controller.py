@@ -35,6 +35,10 @@ class WaveController:
         self.model = model
         self.isPlaying = False
 
+        
+        # Initialize a zero-wave
+        self.wave = self.model.getCombinedWave()
+
         # Initialize a temporary wave effect
         self.effect = waveform.play(np.zeros(int(self.model.getDuration()*self.model.getSampleRate())), sr=self.model.getSampleRate())
 
@@ -120,18 +124,20 @@ class WaveController:
 
     def playCurrentWaveform(self, key):
         if key == 0: # This might be bad design, but the zero index is the global view
-            wave = self.model.getCombinedWave()
+            self.wave = self.model.getCombinedWave()
         else:
-            wave = self.model.getWave(key)
-            self.effect = waveform.play(wave)
-            self.effect.play()
+            if self.model.getPointCount(key) >= 2:
+                # Check that there is a minimum of 2 points
+                self.wave = self.model.getWave(key)
+                self.effect = waveform.play(self.wave)
+                self.effect.play()
             '''path = waveform.generateWaveFilepath()
             print(path)
             waveform.saveWavFile(path, wave, self.model.sample_rate)
             duration = self.model.getDuration()
             self.view.setStopTimer(duration)'''
-        self.proc = multiprocessing.Process(target=self.playSoundProcess, args=(wave,))
-        self.proc.start()
+        #self.proc = multiprocessing.Process(target=self.playSoundProcess, args=(wave,))
+        #self.proc.start()
 
     def playSoundProcess(self, wave):
         self.effect = waveform.play(wave)

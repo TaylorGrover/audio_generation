@@ -73,9 +73,16 @@ class WaveModel:
                 self.updateSineInterpolation(key)
 
     def clearGraphPoints(self, keyIndex):
+        self.subtractWaveFromCombined(keyIndex)
         self.waveDict[keyIndex][self.point_key_str] = []
         self.waveDict[keyIndex][self.linear_interp_str] = np.array([[]])
         self.waveDict[keyIndex][self.sine_interp_str] = np.array([])
+        self.waveDict[keyIndex][self.sine_extrap_str] = np.array([])
+        self.waveDict[keyIndex][self.linear_extrap_str] = np.array([])
+
+
+    def subtractWaveFromCombined(self, keyIndex):
+
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
@@ -181,7 +188,7 @@ class WaveModel:
             if max_value > 0:
                 self.combined_wave /= max_value
         
-    def getCombinedWave(self, norm=True):
+    def getCombinedWave(self):
         return self.combined_wave
 
 class Project:
