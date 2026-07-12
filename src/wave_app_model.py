@@ -156,7 +156,8 @@ class WaveModel:
 
     def updateDuration(self, duration:float):
         self.duration = duration
-        self.combined_wave = np.zeros(int(duration * self.sample_rate))
+        self.t = np.linspace(0, duration, int(duration * self.sample_rate))
+        self.combined_wave = np.zeros_like(self.t)
         self.calculateCombinedWave(recalculate=True, norm=True)
 
     def updateComponentDurations(self, duration:float):
@@ -199,9 +200,14 @@ class WaveModel:
         Normalize and fade out the end slightly
         """
         wave = self.getComponentWave(key, recalculate=recalculate)
+        wave = self.calculatePlayableWave(wave)
+        return wave
+
+    def calculatePlayableWave(self, wave:np.ndarray) -> np.ndarray:
         wave /= np.max(np.abs(wave), axis=0)
-        #wave = np.concatenate([wave, np.zeros(int(self.getSampleRate() * .1))])
-        fade_out = waveform.fade_out(np.array([wave, wave]).T, .005, self.sample_rate)
+        if len(wave.shape) == 1:
+            wave = np.array([wave, wave]).T
+        fade_out = waveform.fade_out(wave, .005, self.sample_rate)
         fade_in = waveform.fade_in(fade_out, .001, self.sample_rate)
         return fade_in
 
@@ -247,13 +253,20 @@ class WaveModel:
             if recalculate:
                 self.calculateExtrapolatedWave(keyIndex)
                 self.calculateSineExtrapolatedWave(keyIndex)
-            if self.waveDict[keyIndex][self.sine_checked_str]:
+            if self.getChecked(keyIndex):
                 self.combined_wave += self.getSineExtrapolatedWave(keyIndex, False)
             else:
                 self.combined_wave += self.getExtrapolatedWave(keyIndex, False)
         
     def getCombinedWave(self):
         return self.combined_wave
+
+    def getTime(self):
+        return self.t
+
+    def getPlayableCombinedWave(self):
+        wave = self.calculatePlayableWave(self.combined_wave)
+        return wave
 
 class Project:
     def __init__(self, project_name:str):

@@ -183,6 +183,9 @@ class WaveView(QMainWindow):
     def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
         self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
 
+    def graphCombinedWave(self, t, wave):
+        self.workspaceWidget.graphCombinedWave(t, wave)
+
     def openCatalogAdditionDialog(self, key) -> bool:
         self.workspaceWidget.openCatalogAdditionDialog(key)
 
@@ -324,8 +327,10 @@ class WorkspaceWidget(QWidget):
         self.pointAdditionSignal.emit(key, x, y)
 
     def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
-        # TODO: Add graph widget to catalog
         self.componentGraph.graphPoints(x, y, interp_x, interp_y, sine_x, sine_y)
+
+    def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray):
+        self.centralGraph.graphCombinedWave(t, wave)
         
     def createNewWaveformWindow(self):
         name = self.waveformNameInputWidget.getName()
@@ -351,10 +356,14 @@ class CentralGraphWidget(QWidget):
         self.isPlaying = False
         self.gridLayout = QGridLayout(self)
         self.graphParametersWidget = GenericGraphParametersWidget()
+        self.pen = pg.mkPen("#ff3300")
 
         self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(0))
         self.window = pg.GraphicsLayoutWidget()
         self.graph = self.window.addPlot(title="Global Graph", row=0, col=0)
+        self.graph.showGrid(True, True, .2)
+        self.graph.setLimits(xMin=0, xMax=10, yMin=-10, yMax=10)
+        self.mouseMovedProxy = pg.SignalProxy(self.graph.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)
 
         self.vertical = pg.InfiniteLine(angle=90, movable=False, pen="#00ccff")
         self.horizontal = pg.InfiniteLine(angle=0, movable=False, pen="#00ccff")
@@ -364,6 +373,25 @@ class CentralGraphWidget(QWidget):
 
         self.graphParametersWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
+
+    def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray):
+        self.clearGraph()
+        self.graph.plot(t, wave, pen=self.pen)
+
+    def mouseMoved(self, event):
+        """
+        Draw vertical and horizontal lines at the cursor position
+        """
+        pos = event[0]
+        if self.graph.sceneBoundingRect().contains(pos):
+            mousePoint = self.graph.vb.mapSceneToView(pos)
+            self.vertical.setPos(mousePoint.x())
+            self.horizontal.setPos(mousePoint.y())
+
+    def clearGraph(self):
+        self.graph.clear()
+        self.graph.addItem(self.vertical)
+        self.graph.addItem(self.horizontal)
 
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
@@ -478,10 +506,6 @@ class ComponentGraphWidget(QWidget):
         if self.viewBox.sceneBoundingRect().contains(click_event.scenePos()):
             plotPosition = self.viewBox.mapSceneToView(scenePos)
             self.pointAdditionSignal.emit(self.keyIndex, plotPosition.x(), plotPosition.y())
-
-    def clearGraphAndPoints(self):
-        self.points = []
-        self.clearGraph()
 
     def clearGraph(self):
         self.oscillator.clear()
@@ -651,8 +675,6 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
     def graphPoints(self, event):
         self.clearGraphSignal.emit()
-        # TODO: Fix below
-        #self.regraphSignal()
         self.regraphSignal.emit()
 
     def clearGraphAndPoints(self, event):

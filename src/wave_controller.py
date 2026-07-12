@@ -166,6 +166,9 @@ class WaveController:
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
         self.graphComponentWaveform(keyIndex)
+        t = self.model.getTime()
+        wave = self.model.getCombinedWave()
+        self.view.graphCombinedWave(t, wave)
 
     def clearGraphPoints(self, keyIndex):
         self.model.clearGraphPoints(keyIndex)
