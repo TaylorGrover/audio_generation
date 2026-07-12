@@ -368,7 +368,7 @@ class CentralGraphWidget(QWidget):
         self.isPlaying = False
         self.gridLayout = QGridLayout(self)
         self.graphParametersWidget = GenericGraphParametersWidget()
-        self.pen = pg.mkPen("#ff3300")
+        self.pen = pg.mkPen("#ff3300", width=3)
 
         self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(0))
         self.window = pg.GraphicsLayoutWidget()
@@ -431,6 +431,9 @@ class ComponentGraphWidget(QWidget):
     sineCountChangedSignal = Signal(int, int)
     volumeUpdateSignal = Signal(int, float)
     stopAudioSignal = Signal()
+
+    # If a component frequency or other parameters are adjusted
+    componentChangedSignal = Signal(int) 
 
     def __init__(self):
         super().__init__()
@@ -684,7 +687,6 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
     def emitFrequencyParameters(self, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(baseFreq, cents, octave)
-
 
     def graphPoints(self, event):
         self.clearGraphSignal.emit()

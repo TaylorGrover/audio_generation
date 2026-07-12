@@ -122,6 +122,7 @@ class WaveModel:
 
     def updateSineInterpolationChecked(self, key:int, isChecked):
         self.waveDict[key][self.sine_checked_str] = isChecked
+        self.updateCombinedWaveComponent(key)
 
     def updateSineCount(self, key:int, count:int):
         # Only add back to the combined wave if currently a sine wave
@@ -153,17 +154,12 @@ class WaveModel:
 
     def updateFrequency(self, key, baseFreq, cents, octave):
         self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
+        self.calculateCombinedWave(recalculate=True)
 
     def updateDuration(self, duration:float):
         self.duration = duration
         self.t = np.linspace(0, duration, int(duration * self.sample_rate))
-        self.combined_wave = np.zeros_like(self.t)
-        self.calculateCombinedWave(recalculate=True, norm=True)
-
-    def updateComponentDurations(self, duration:float):
-        """
-
-        """
+        self.calculateCombinedWave(recalculate=True)
 
     def getFrequency(self, key):
         freq = self.waveDict[key][self.freq_str]
@@ -248,7 +244,8 @@ class WaveModel:
             self.calculateSineExtrapolatedWave(key)
         return self.waveDict[key][self.sine_extrap_str]
 
-    def calculateCombinedWave(self, recalculate=False, norm=True):
+    def calculateCombinedWave(self, recalculate=False):
+        self.combined_wave = np.zeros_like(self.t)
         for keyIndex in self.waveDict:
             if recalculate:
                 self.calculateExtrapolatedWave(keyIndex)

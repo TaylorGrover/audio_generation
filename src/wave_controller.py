@@ -103,9 +103,6 @@ class WaveController:
         # Button shortcuts
         #self.actionMonitor = actionMonitor
     
-    def updateVolume(self, keyIndex:int, vol:float):
-        self.model.updateVolume(keyIndex, vol)
-    
     def openCatalogAdditionDialog(self, event):
         """
         Add a wave graph to the catalogSection vbox
@@ -113,6 +110,9 @@ class WaveController:
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
 
+    def updateVolume(self, keyIndex:int, vol:float):
+        self.model.updateVolume(keyIndex, vol)
+    
     def updateSineInterpolationChecked(self, key:int, isChecked:bool):
         self.model.updateSineInterpolationChecked(key, isChecked)
 
@@ -123,13 +123,15 @@ class WaveController:
     def updateDuration(self, duration:float):
         self.model.updateDuration(duration)
 
+    def updateFrequency(self, keyIndex, baseFreq, cents, octave):
+        self.model.updateFrequency(keyIndex, baseFreq, cents, octave)
+
     def playCurrentWaveform(self, key):
         if key == 0: # This might be bad design, but the zero index is the global view
             self.wave = self.model.getPlayableCombinedWave()
         else:
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
-                #self.wave = self.model.getWave(key, recalculate=True)
                 self.wave = self.model.getPlayableComponentWave(key, recalculate=True)
         duration = self.model.getDuration()
         self.view.setStopTimer(duration)
@@ -160,9 +162,6 @@ class WaveController:
             self.keyIndexCounter += 1
         else:
             self.view.displayDupNameErrMsg()
-
-    def updateFrequency(self, keyIndex, baseFreq, cents, octave):
-        self.model.updateFrequency(keyIndex, baseFreq, cents, octave)
 
     def addPointToWave(self, keyIndex, x, y):
         self.model.addPoint(keyIndex, x, y)
