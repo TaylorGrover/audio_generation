@@ -389,6 +389,7 @@ class CentralGraphWidget(QWidget):
     def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray):
         self.clearGraph()
         self.graph.plot(t, wave, pen=self.pen)
+        self.graph.setLimits(xMin=0, xMax=10, yMin=np.min(wave), yMax=np.max(wave))
 
     def mouseMoved(self, event):
         """
