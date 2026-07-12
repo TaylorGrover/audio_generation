@@ -132,6 +132,7 @@ class WaveController:
                 #self.wave = self.model.getWave(key, recalculate=True)
                 self.wave = self.model.getPlayableComponentWave(key, recalculate=True)
         duration = self.model.getDuration()
+        self.view.setStopTimer(duration)
         self.soundPlayer.play(self.wave, self.model.getSampleRate())
 
     def stopAudio(self):

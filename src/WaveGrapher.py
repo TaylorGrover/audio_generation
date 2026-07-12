@@ -443,7 +443,6 @@ class ComponentGraphWidget(QWidget):
 
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
-        self.graphParametersWidget.enablePlayButton()
 
     def getKeyIndex(self):
         return self.keyIndex
@@ -465,7 +464,6 @@ class ComponentGraphWidget(QWidget):
 
     def emitPlaySignal(self):
         self.playSignal.emit(self.keyIndex)
-        self.graphParametersWidget.enableStopButton()
 
     def emitClearGraphSignal(self):
         self.clearGraph()
@@ -505,9 +503,6 @@ class ComponentGraphWidget(QWidget):
         self.oscillator.scatterPlot(interp_x, interp_y, pen=self.sineInterpolatedPen)
         self.oscillator.plot(interp_x, interp_y, pen=self.linearInterpolatedPen)
         self.oscillator.plot(sine_x, sine_y, pen=self.sineInterpolatedPen)
-
-    def resetPlayButton(self):
-        self.playButton.setText("Play")
 
     def getVolume(self):
         return self.volumeSlider.getVolume()
@@ -581,6 +576,12 @@ class GenericGraphParametersWidget(QWidget):
     def setDurationWidgetValue(self, duration: float):
         self.durationSpin.setValue(duration)
 
+    def setStopTimer(self, duration:float):
+        self.playTimer = QTimer()
+        self.playTimer.setSingleShot(True)
+        self.playTimer.timeout.connect(self.resetPlayButton)
+        self.playTimer.start(int(round(duration * 1000)))
+
     def emitDurationChanged(self):
         self.durationChangedSignal.emit(self.durationSpin.value())
 
@@ -588,24 +589,18 @@ class GenericGraphParametersWidget(QWidget):
         self.volumeUpdateSignal.emit(vol)
 
     def playWaveform(self, event):
-        self.playSignal.emit(0)
+        if not self.isPlaying:
+            self.playSignal.emit(0)
+            self.isPlaying = True
+            self.playButton.setText("Stop")
+        else:
+            self.stopAudioSignal.emit()
+            self.resetPlayButton()
 
-    def enableStopButton(self):
-        self.playButton.setText("Stop")
-        self.playButton.clicked.disconnect(self.playWaveform)
-        self.playButton.clicked.connect(self.emitStopAudio)
-
-    def enablePlayButton(self):
+    def resetPlayButton(self):
         self.playButton.setText("Play")
-        self.playButton.clicked.disconnect(self.emitStopAudio)
-        self.playButton.clicked.connect(self.playWaveform)
+        self.isPlaying = False
 
-
-    def setStopTimer(self, duration:float):
-        self.playTimer = QTimer()
-        self.playTimer.timeout.connect(self.emitStopAudioAndResetPlayButton)
-        self.playTimer.start(int(duration * 1000))
-    
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
 

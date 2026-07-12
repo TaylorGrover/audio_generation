@@ -201,8 +201,9 @@ class WaveModel:
         wave = self.getComponentWave(key, recalculate=recalculate)
         wave /= np.max(np.abs(wave), axis=0)
         #wave = np.concatenate([wave, np.zeros(int(self.getSampleRate() * .1))])
-        wave = waveform.fade_out(wave, .001, self.getSampleRate())
-        return wave
+        fade_out = waveform.fade_out(np.array([wave, wave]).T, .005, self.sample_rate)
+        fade_in = waveform.fade_in(fade_out, .001, self.sample_rate)
+        return fade_in
 
 
     def calculateExtrapolatedWave(self, key):
