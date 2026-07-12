@@ -125,7 +125,7 @@ class WaveController:
 
     def playCurrentWaveform(self, key):
         if key == 0: # This might be bad design, but the zero index is the global view
-            self.wave = self.model.getCombinedWave()
+            self.wave = self.model.getPlayableCombinedWave()
         else:
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
@@ -155,7 +155,8 @@ class WaveController:
             self.view.addWaveToCatalog(self.keyIndexCounter, name)
             self.view.closeWaveNameInputWidget()
             self.model.createEmptyWave(self.keyIndexCounter, name)
-            self.view.showComponentGraph(self.keyIndexCounter)
+            #self.view.showComponentGraph(self.keyIndexCounter)
+            self.view.swapGraphs()
             self.keyIndexCounter += 1
         else:
             self.view.displayDupNameErrMsg()

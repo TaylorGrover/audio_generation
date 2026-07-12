@@ -82,8 +82,11 @@ class WaveView(QMainWindow):
     def emitSineCountChanged(self, keyIndex:int, count:int):
         self.sineCountChangedSignal.emit(keyIndex, count)
     
-    def addWaveToCatalog(self, key_index:int, name:str):
-        self.workspaceWidget.addWaveToCatalog(key_index, name)
+    def addWaveToCatalog(self, keyIndex:int, name:str):
+        self.workspaceWidget.addWaveToCatalog(keyIndex, name)
+    
+    def swapGraphs(self):
+        self.workspaceWidget.swapGraphs()
 
     def displayDupNameErrMsg(self):
         self.workspaceWidget.displayDupNameErrMsg()
@@ -250,18 +253,21 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
 
     def swapGraphs(self):
-        item = self.gridLayout.itemAtPosition(0, 1)
-        widget = item.widget()
-        if widget == self.centralGraph:
-            self.catalogWidget.toggleComponentButton()
-            newWidget = self.componentGraph
-        elif widget == self.componentGraph:
-            self.catalogWidget.toggleMainButton()
-            newWidget = self.centralGraph
-        self.gridLayout.removeWidget(widget)
-        widget.hide()
-        self.gridLayout.addWidget(newWidget, 0, 1)
-        newWidget.setVisible(True)
+        # Only swap graphs if the current component index is >0,
+        # as this implies there actually exists a component wave
+        if self.componentGraph.getKeyIndex() > 0:
+            item = self.gridLayout.itemAtPosition(0, 1)
+            widget = item.widget()
+            if widget == self.centralGraph:
+                self.catalogWidget.toggleMainButton()
+                newWidget = self.componentGraph
+            elif widget == self.componentGraph:
+                self.catalogWidget.toggleComponentButton()
+                newWidget = self.centralGraph
+            self.gridLayout.removeWidget(widget)
+            widget.hide()
+            self.gridLayout.addWidget(newWidget, 0, 1)
+            newWidget.setVisible(True)
 
     def emitVolume(self, key:int, vol:float):
         self.volumeUpdateSignal.emit(key, vol)
@@ -284,14 +290,6 @@ class WorkspaceWidget(QWidget):
 
     def setDurationWidgetValue(self, duration:float):
         self.centralGraph.setDurationWidgetValue(duration)
-
-    def switchToComponentGraph(self):
-        """
-        This is a wrapper for showComponentGraph for the signal. 
-        It just switches back to the most recent component graph 
-        index available 
-        """
-        self.showComponentGraph(self.componentGraph.getKeyIndex())
 
     def setStopTimer(self, duration:float):
         self.componentGraph.setStopTimer(duration)
@@ -316,7 +314,7 @@ class WorkspaceWidget(QWidget):
             widget.hide()
             self.gridLayout.addWidget(self.componentGraph, 0, 1)
             self.componentGraph.setVisible(True)
-            self.catalogWidget.setToggleMainButton()
+            self.catalogWidget.toggleMainButton()
 
     def displayDupNameErrMsg(self):
         self.waveformNameInputWidget.displayDupNameErrMsg()
@@ -355,8 +353,9 @@ class WorkspaceWidget(QWidget):
         self.waveformNameInputWidget.setVisible(True)
         self.waveformNameInputWidget.focusInput()
 
-    def addWaveToCatalog(self, key_index:int, name:str):
-        self.catalogWidget.addWaveWidgetToCatalog(key_index, name)
+    def addWaveToCatalog(self, keyIndex:int, name:str):
+        self.catalogWidget.addWaveWidgetToCatalog(keyIndex, name)
+        self.componentGraph.setKeyIndex(keyIndex)
         self.waveformNameInputWidget.closeWindowAndClearInput()
 
 class CentralGraphWidget(QWidget):
@@ -896,24 +895,17 @@ class WaveformCatalogWidget(QWidget):
     def emitInititateAddCatalogWave(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
 
-    def emitSwitchToMainGraph(self):
-        self.switchToMainSignal.emit()
-
-    def emitSwitchToComponentGraph(self):
-        self.switchToComponentSignal.emit()
-
     def toggleMainButton(self):
         self.toggleGraphButton.setText("Main")
 
     def toggleComponentButton(self):
         self.toggleGraphButton.setText("Component")
 
-    def addWaveWidgetToCatalog(self, key_index, name:str):
-        self.labeledWavesDict[key_index] = {
+    def addWaveWidgetToCatalog(self, keyIndex, name:str):
+        self.labeledWavesDict[keyIndex] = {
             "name": name,
         }
-        self.emitSwapGraphs(key_index)
+        self.emitSwapGraphs(keyIndex)
         
-    def emitSwapGraphs(self, key_index):
-        
-        self.swapGraphsSignal.emit(key_index)
+    def emitSwapGraphs(self, keyIndex):
+        self.swapGraphsSignal.emit(keyIndex)
