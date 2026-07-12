@@ -34,8 +34,7 @@ class WaveView(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.wave = np.zeros(48000)
-        self.effect = waveform.play(self.wave)
+        self.maximized = False
         toolBar = QToolBar()
         self.addToolBar(toolBar)
         fileMenu = self.menuBar().addMenu("&File")
@@ -47,6 +46,10 @@ class WaveView(QMainWindow):
         self.maxHeight = self.screen().availableGeometry().height()
         self.workspaceWidget = WorkspaceWidget(self.maxWidth, self.maxHeight)
         self.setCentralWidget(self.workspaceWidget)
+        
+        # Actions
+        fullScreenAction = QAction("&Fullscreen", self, shortcut="F11", triggered=self.maximize)
+        self.addAction(fullScreenAction)
 
         # Signals and slots
         self.workspaceWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAdded)
@@ -60,6 +63,13 @@ class WaveView(QMainWindow):
         self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
         self.workspaceWidget.stopAudioSignal.connect(self.emitStopAudioSignal)
+
+    def maximize(self):
+        if self.maximized:
+            self.showNormal()
+        else:
+            self.showMaximized()
+        self.maximized = not self.maximized
 
     def emitStopAudioSignal(self):
         self.stopAudioSignal.emit()
