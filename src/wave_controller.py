@@ -1,18 +1,9 @@
 from action_monitor import ActionMonitor
 import multiprocessing
 import numpy as np
-import playsound
-import utilities
+import SoundPlayer
 import waveform
-if utilities.getOS() == "windows":
-    import winsound
 
-def playSoundProcess(path):
-    operating_system = utilities.getOS()
-    if operating_system == "windows":
-        winsound.PlaySound(path, winsound.SND_ASYNC)
-    elif operating_system == "linux":
-        playsound.playsound(path, block=False)
 
 """
 This is the interface between GUI and wave data model.
@@ -33,16 +24,13 @@ class WaveController:
         self.view = view 
         self.model = model
         self.isPlaying = False
-
+        self.soundPlayer = SoundPlayer.SoundPlayer()
         
-        # Initialize a zero-wave
-        self.wave = self.model.getCombinedWave()
-
-        # Initialize a temporary wave effect
-        self.effect = waveform.play(np.zeros(int(self.model.getDuration()*self.model.getSampleRate())), sr=self.model.getSampleRate())
-
         # Set the view's duration button based on the model
         self.view.setDurationWidgetValue(self.model.getDuration())
+
+        # Set initial wave
+        self.wave = np.zeros(int(self.model.getDuration() * self.model.getSampleRate()))
 
         # TODO: Decide between initializing the model parameters based on the view defaults or vice versa.
         
@@ -56,6 +44,9 @@ class WaveController:
 
         # Play the current toggled waveform
         self.view.playSignal.connect(self.playCurrentWaveform)
+
+        # Stop the currently playing audio
+        self.view.stopAudioSignal.connect(self.stopAudio)
 
         # Add a wave to the catalog
         # TODO: Finish implementing this
@@ -138,23 +129,13 @@ class WaveController:
         else:
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
-                self.wave = self.model.getWave(key, recalculate=True)
-                path = waveform.generateWaveFilepath()
-                waveform.saveWavFile(path, self.wave, self.model.getSampleRate())
-                playSoundProcess(path)
-                #self.effect = waveform.play(self.wave, sr=self.model.getSampleRate())
-                #self.effect.play()
-            '''path = waveform.generateWaveFilepath()
-            print(path)
-            waveform.saveWavFile(path, wave, self.model.sample_rate)
-            duration = self.model.getDuration()
-            self.view.setStopTimer(duration)'''
-        #self.proc = multiprocessing.Process(target=self.playSoundProcess, args=(wave,))
-        #self.proc.start()
+                #self.wave = self.model.getWave(key, recalculate=True)
+                self.wave = self.model.getPlayableComponentWave(key, recalculate=True)
+        duration = self.model.getDuration()
+        self.soundPlayer.play(self.wave, self.model.getSampleRate())
 
     def stopAudio(self):
-        if hasattr(self, "proc"):
-            self.proc.terminate()
+        self.soundPlayer.stop()
 
     def graphComponentWaveform(self, key):
         x, y = self.model.getPointsXY(key)

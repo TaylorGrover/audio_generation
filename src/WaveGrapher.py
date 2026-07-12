@@ -29,6 +29,7 @@ class WaveView(QMainWindow):
     sineCountChangedSignal = Signal(int, int)
     sineStateChangedSignal = Signal(int, bool)
     volumeUpdateSignal = Signal(int, float)
+    stopAudioSignal = Signal()
 
     def __init__(self):
         super().__init__()
@@ -58,6 +59,10 @@ class WaveView(QMainWindow):
         self.workspaceWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
+        self.workspaceWidget.stopAudioSignal.connect(self.emitStopAudioSignal)
+
+    def emitStopAudioSignal(self):
+        self.stopAudioSignal.emit()
 
     def setDurationWidgetValue(self, duration:float):
         self.workspaceWidget.setDurationWidgetValue(duration)
@@ -188,6 +193,476 @@ class WaveView(QMainWindow):
         QApplication.closeAllWindows()
         event.accept()
 
+class WorkspaceWidget(QWidget):
+    """
+    This is the main widget containing the main graph view 
+    (for editors and the summed signal)
+    """
+    initiateCatalogAdditionSignal = Signal(int)
+    createCatalogWaveSignal = Signal(str)
+    swapGraphViewSignal = Signal(int)
+    
+    playSignal = Signal(int)
+    graphSignal = Signal(int)
+    clearGraphSignal = Signal(int)
+    pointAdditionSignal = Signal(int, float, float)
+    frequencyChangedSignal = Signal(int, str, int, int)
+    sineStateChangedSignal = Signal(int, bool)
+    sineCountChangedSignal = Signal(int, int)
+    durationChangedSignal = Signal(float)
+    volumeUpdateSignal = Signal(int, float)
+    stopAudioSignal = Signal()
+
+    def __init__(self, maxWidth, maxHeight):
+        super().__init__()
+        self.maxWidth = maxWidth
+        self.maxHeight = maxHeight
+        self.waveformNameInputWidget = WaveNameInputWidget(maxWidth, maxHeight)
+        self.waveformNameInputWidget.createCatalogWaveSignal.connect(self.createNewWaveformWindow)
+        self.waveformNameInputWidget.move(self.maxWidth//2, self.maxHeight//2)
+        self.waveformWidgetDict = {}
+        self.gridLayout = QGridLayout(self)
+        self.componentGraph = ComponentGraphWidget()
+        self.centralGraph = CentralGraphWidget()
+
+        self.catalogWidget = WaveformCatalogWidget()
+        self.gridLayout.addWidget(self.catalogWidget, 0, 0)
+        self.gridLayout.addWidget(self.centralGraph, 0, 1)
+
+        # Signal management
+        self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
+        self.catalogWidget.switchToMainSignal.connect(self.showCentralGraph)
+        self.catalogWidget.switchToComponentSignal.connect(self.switchToComponentGraph)
+
+        self.centralGraph.playSignal.connect(self.emitPlaySignal)
+        self.centralGraph.durationChangedSignal.connect(self.emitDurationChanged)
+        self.centralGraph.stopAudioSignal.connect(self.emitStopAudio)
+
+        self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
+        self.componentGraph.playSignal.connect(self.emitPlaySignal)
+        self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
+        self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
+        self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
+        self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
+        self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
+
+    def emitVolume(self, key:int, vol:float):
+        self.volumeUpdateSignal.emit(key, vol)
+    
+    def emitStopAudio(self):
+        self.stopAudioSignal.emit()
+    
+    def emitDurationChanged(self, duration:float):
+        self.durationChangedSignal.emit(duration)
+
+    def showCentralGraph(self):
+        item = self.gridLayout.itemAtPosition(0, 1)
+        widget = item.widget()
+        if widget == self.componentGraph:
+            self.gridLayout.removeWidget(widget)
+            widget.hide()
+            self.gridLayout.addWidget(self.centralGraph, 0, 1)
+            self.centralGraph.setVisible(True)
+            self.catalogWidget.setToggleComponentButton()
+
+    def setDurationWidgetValue(self, duration:float):
+        self.centralGraph.setDurationWidgetValue(duration)
+
+    def switchToComponentGraph(self):
+        """
+        This is a wrapper for showComponentGraph for the signal. 
+        It just switches back to the most recent component graph 
+        index available 
+        """
+        self.showComponentGraph(self.componentGraph.getKeyIndex())
+
+    def setStopTimer(self, duration:float):
+        self.componentGraph.setStopTimer(duration)
+        self.centralGraph.setStopTimer(duration)
+
+    def emitSineStateChanged(self, keyIndex, isChecked):
+        self.sineStateChangedSignal.emit(keyIndex, isChecked)
+
+    def emitSineCountChanged(self, key, count:int):
+        self.sineCountChangedSignal.emit(key, count)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
+
+    def showComponentGraph(self, keyIndex:int):
+        # Check if the centralGraph is currently in place
+        item = self.gridLayout.itemAtPosition(0, 1)
+        widget = item.widget()
+        if widget == self.centralGraph:
+            self.gridLayout.removeWidget(widget)
+            widget.hide()
+            self.componentGraph.setKeyIndex(keyIndex)
+            self.gridLayout.addWidget(self.componentGraph, 0, 1)
+            self.componentGraph.setVisible(True)
+            self.catalogWidget.setToggleMainButton()
+
+    def displayDupNameErrMsg(self):
+        self.waveformNameInputWidget.displayDupNameErrMsg()
+
+    def closeWaveNameInputWidget(self):
+        self.waveformNameInputWidget.closeWindowAndClearInput()
+
+    def emitFrequencyParameters(self, keyIndex, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
+
+    def emitCatalogWaveAddInitiate(self, event):
+        self.initiateCatalogAdditionSignal.emit(event)
+
+    def emitPlaySignal(self, index):
+        self.playSignal.emit(index)
+
+    def emitGraphSignal(self, key):
+        self.graphSignal.emit(key)
+
+    def emitPointAdditionSignal(self, key, x, y):
+        self.pointAdditionSignal.emit(key, x, y)
+
+    def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
+        # TODO: Add graph widget to catalog
+        self.componentGraph.graphPoints(x, y, interp_x, interp_y, sine_x, sine_y)
+        
+    def createNewWaveformWindow(self):
+        name = self.waveformNameInputWidget.getName()
+        self.createCatalogWaveSignal.emit(name)
+
+    def openCatalogAdditionDialog(self, key) -> bool:
+        """ Attempt to get name for waveform. If failure, return False.
+        """
+        self.waveformNameInputWidget.setVisible(True)
+        self.waveformNameInputWidget.focusInput()
+
+    def addWaveToCatalog(self, key_index:int, name:str):
+        self.catalogWidget.addWaveWidgetToCatalog(key_index, name)
+        self.waveformNameInputWidget.closeWindowAndClearInput()
+
+class CentralGraphWidget(QWidget):
+    playSignal = Signal(int)
+    durationChangedSignal = Signal(float)
+    stopAudioSignal = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.isPlaying = False
+        self.gridLayout = QGridLayout(self)
+        self.graphParametersWidget = GenericGraphParametersWidget()
+
+        self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(0))
+        self.window = pg.GraphicsLayoutWidget()
+        self.graph = self.window.addPlot(title="Global Graph", row=0, col=0)
+
+        self.vertical = pg.InfiniteLine(angle=90, movable=False, pen="#00ccff")
+        self.horizontal = pg.InfiniteLine(angle=0, movable=False, pen="#00ccff")
+        
+        self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
+        self.gridLayout.addWidget(self.window, 0, 1)
+
+        self.graphParametersWidget.durationChangedSignal.connect(self.emitDurationChanged)
+        self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
+
+    def emitStopAudio(self):
+        self.stopAudioSignal.emit()
+
+    def setDurationWidgetValue(self, duration: float):
+        self.graphParametersWidget.setDurationWidgetValue(duration)
+
+    def emitDurationChanged(self, duration):
+        self.durationChangedSignal.emit(duration)
+
+    def setStopTimer(self, duration:float):
+        self.graphParametersWidget.setStopTimer(duration)
+
+
+class ComponentGraphWidget(QWidget):
+    pointAdditionSignal = Signal(int, float, float)
+    playSignal = Signal(int)
+    graphSignal = Signal(int)
+    clearGraphSignal = Signal(int)
+    regraphSignal = Signal(int)
+    # Throw the index in as well 
+    frequencyChangedSignal = Signal(int, str, int, int)
+    sineStateChangedSignal = Signal(int, bool)
+    sineCountChangedSignal = Signal(int, int)
+    volumeUpdateSignal = Signal(int, float)
+    stopAudioSignal = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.isPlaying = False
+        self.keyIndex = 0
+        self.seed = np.array([])
+        self.points = []
+        self.gridLayout = QGridLayout(self)
+        self.window = pg.GraphicsLayoutWidget()
+        #self.amplitudeEnvelope = self.window.addPlot(title="Amplitude Envelope", row=0, col=0)
+        #self.frequencyEnvelope = self.window.addPlot(title="Frequency Envelope", row=1, col=0)
+        self.oscillator = self.window.addPlot(title="Oscillator", row=2, col=0)
+        #self.graph2 = self.window.addPlot(title="Frequency Env", row=0, col=0)
+        self.oscillator.setXRange(0, 1)
+        self.oscillator.setYRange(-1, 1)
+        self.viewBox = self.oscillator.vb
+        self.vertical = pg.InfiniteLine(angle=90, movable=False, pen="#00ccff")
+        self.horizontal = pg.InfiniteLine(angle=0, movable=False, pen="#00ccff")
+        self.oscillator.addItem(self.vertical)
+        self.oscillator.addItem(self.horizontal)
+        self.mouseMovedProxy = pg.SignalProxy(self.oscillator.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)
+        # Prevent dragging
+        self.oscillator.setLimits(xMin=0, xMax=1, yMin=-1, yMax=1)
+
+        # Connect to self.addPoint
+        self.mouseClickedProxy = pg.SignalProxy(self.oscillator.scene().sigMouseClicked, rateLimit=120, slot=self.addPoint)
+
+        self.oscillator.showGrid(True, True, .5)
+
+        self.plotPen = pg.mkPen("#0099bb", width=2)
+        self.sineInterpolatedPen = pg.mkPen("#ff0000", width=2)
+        self.linearInterpolatedPen = pg.mkPen("#ff00ff", width=2)
+
+        self.scatterPen = pg.mkPen("#aa0000", width=2)
+
+        self.graphParametersWidget = GraphParametersWidget()
+
+        self.graphParametersWidget.regraphSignal.connect(self.graphPoints)
+        self.graphParametersWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
+        self.graphParametersWidget.playSignal.connect(self.emitPlaySignal)
+        self.graphParametersWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.graphParametersWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
+        self.graphParametersWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
+        self.graphParametersWidget.volumeUpdateSignal.connect(self.emitVolume)
+        self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
+
+        self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
+        self.gridLayout.addWidget(self.window, 0, 1)
+        #self.gridLayout.setSpacing(0)
+        #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def emitStopAudio(self):
+        self.stopAudioSignal.emit()
+        self.graphParametersWidget.enablePlayButton()
+
+    def getKeyIndex(self):
+        return self.keyIndex
+
+    def setStopTimer(self, duration:float):
+        self.graphParametersWidget.setStopTimer(duration)
+
+    def emitVolume(self, vol:float):
+        self.volumeUpdateSignal.emit(self.keyIndex, vol)
+
+    def emitSineCountChanged(self, count):
+        self.sineCountChangedSignal.emit(self.keyIndex, count)
+
+    def emitSineStateChanged(self, isChecked:bool):
+        self.sineStateChangedSignal.emit(self.keyIndex, isChecked)
+
+    def emitFrequencyParameters(self, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(self.keyIndex, baseFreq, cents, octave)
+
+    def emitPlaySignal(self):
+        self.playSignal.emit(self.keyIndex)
+        self.graphParametersWidget.enableStopButton()
+
+    def emitClearGraphSignal(self):
+        self.clearGraph()
+        self.clearGraphSignal.emit(self.keyIndex)
+
+    def setKeyIndex(self, keyIndex):
+        self.keyIndex = keyIndex
+
+    def addPoint(self, event):
+        click_event, = event
+        scenePos = click_event.scenePos()
+        if self.viewBox.sceneBoundingRect().contains(click_event.scenePos()):
+            plotPosition = self.viewBox.mapSceneToView(scenePos)
+            self.pointAdditionSignal.emit(self.keyIndex, plotPosition.x(), plotPosition.y())
+
+    def clearGraphAndPoints(self):
+        self.points = []
+        self.clearGraph()
+
+    def clearGraph(self):
+        self.oscillator.clear()
+        self.oscillator.addItem(self.vertical)
+        self.oscillator.addItem(self.horizontal)
+
+
+    def plot(self, x, y, pen=None):
+        self.oscillator.plot(x, y, pen=pen)
+
+    def scatterPlot(self, x, y, pen=None):
+        self.oscillator.scatterPlot(x, y, pen=pen)
+
+    def graphPoints(self, x, y, interp_x, interp_y, sine_x, sine_y):
+        self.clearGraph()
+        #x, y = zip(*self.points)
+        self.oscillator.plot(x, y, pen=self.plotPen)
+        self.oscillator.scatterPlot(x, y, pen=self.scatterPen)
+        self.oscillator.scatterPlot(interp_x, interp_y, pen=self.sineInterpolatedPen)
+        self.oscillator.plot(interp_x, interp_y, pen=self.linearInterpolatedPen)
+        self.oscillator.plot(sine_x, sine_y, pen=self.sineInterpolatedPen)
+
+    def resetPlayButton(self):
+        self.playButton.setText("Play")
+
+    def getVolume(self):
+        return self.volumeSlider.getVolume()
+
+    def getFrequency(self):
+        return self.frequencyWidget.getFrequency()
+
+    def getDuration(self):
+        return self.durationSpin.value()
+
+    def getPoints(self):
+        return list(zip(*self.points))
+
+    def setPoints(self, points):
+        self.points = points
+
+    def mouseMoved(self, event):
+        """
+        Draw vertical and horizontal lines at the cursor position
+        """
+        pos = event[0]
+        if self.oscillator.sceneBoundingRect().contains(pos):
+            mousePoint = self.oscillator.vb.mapSceneToView(pos)
+            self.vertical.setPos(mousePoint.x())
+            self.horizontal.setPos(mousePoint.y())
+
+    def plot(self, t, waveform):
+        hPen = pg.mkPen("#0099bb", width=3)
+        self.oscillator.plot(t, waveform, pen=hPen)
+        #self.oscillator.setMinimumWidth(self.graphWidget.height())
+
+    def clear(self):
+        self.oscillator.clear()
+
+
+class GenericGraphParametersWidget(QWidget):
+    # Contains the index of the waveform
+    playSignal = Signal(int)
+    durationChangedSignal = Signal(float)
+    volumeUpdateSignal = Signal(float)
+    stopAudioSignal = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.isPlaying = False
+        self.controlLayout = QFormLayout(self)
+        self.parameterWidgetMaximumSize = QSize(350, 700)
+        self.parameterWidgetMinimumSize = QSize(30, 30)
+
+        self.volumeSlider = VolumeControlsWidget()
+
+        self.playButton = QPushButton("Play")
+        self.playButton.setMinimumSize(self.parameterWidgetMinimumSize)
+        self.playButton.setMaximumSize(QSize(100, 100))
+        #self.setMinimumSize(self.parameterWidgetMinimumSize)
+        self.setMaximumSize(QSize(250, 800))
+
+        self.durationSpin = QDoubleSpinBox()
+        self.durationSpin.setRange(1, 10)
+        self.durationSpin.setValue(3)
+        self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
+        self.durationSpin.valueChanged.connect(self.emitDurationChanged)
+
+        self.playButton.clicked.connect(self.playWaveform)
+        self.volumeSlider.volumeUpdateSignal.connect(self.emitVolume)
+
+        self.controlLayout.addRow("Volume:", self.volumeSlider)
+        self.controlLayout.addRow("Duration:", self.durationSpin)
+        self.controlLayout.addRow("", self.playButton)
+    
+    def setDurationWidgetValue(self, duration: float):
+        self.durationSpin.setValue(duration)
+
+    def emitDurationChanged(self):
+        self.durationChangedSignal.emit(self.durationSpin.value())
+
+    def emitVolume(self, vol:float):
+        self.volumeUpdateSignal.emit(vol)
+
+    def playWaveform(self, event):
+        self.playSignal.emit(0)
+
+    def enableStopButton(self):
+        self.playButton.setText("Stop")
+        self.playButton.clicked.disconnect(self.playWaveform)
+        self.playButton.clicked.connect(self.emitStopAudio)
+
+    def enablePlayButton(self):
+        self.playButton.setText("Play")
+        self.playButton.clicked.disconnect(self.emitStopAudio)
+        self.playButton.clicked.connect(self.playWaveform)
+
+
+    def setStopTimer(self, duration:float):
+        self.playTimer = QTimer()
+        self.playTimer.timeout.connect(self.emitStopAudioAndResetPlayButton)
+        self.playTimer.start(int(duration * 1000))
+    
+    def emitStopAudio(self):
+        self.stopAudioSignal.emit()
+
+class GraphParametersWidget(GenericGraphParametersWidget):
+    regraphSignal = Signal()
+    clearGraphSignal = Signal()
+    frequencyChangedSignal = Signal(str, int, int)
+    sineStateChangedSignal = Signal(bool)
+    sineCountChangedSignal = Signal(int)
+
+    def __init__(self):
+        super().__init__()
+
+        self.clearButton = QPushButton("Clear")
+        self.clearButton.setMinimumSize(self.parameterWidgetMinimumSize)
+        self.clearButton.setMaximumSize(self.parameterWidgetMaximumSize)
+        self.clearButton.clicked.connect(self.clearGraphAndPoints)
+
+
+        self.sineInterpolatorWidget = SineInterpolatorWidget()
+        self.sineInterpolatorWidget.setMinimumSize(self.parameterWidgetMinimumSize)
+        self.sineInterpolatorWidget.setMaximumSize(self.parameterWidgetMaximumSize)
+        self.frequencyWidget = FrequencyWidget()
+
+        self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
+        self.controlLayout.addRow("Freq:", self.frequencyWidget)
+        self.controlLayout.addRow("", self.clearButton)
+        self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        self.controlLayout.setSpacing(10)
+        self.controlLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.controlLayout.removeRow(1)
+
+        # Slots and Signals
+        self.sineInterpolatorWidget.changedSignal.connect(self.emitSineStateChanged)
+        self.sineInterpolatorWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
+        self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+
+    def emitSineCountChanged(self, count):
+        self.sineCountChangedSignal.emit(count)
+
+    def emitSineStateChanged(self, isChecked):
+        self.sineStateChangedSignal.emit(isChecked)
+
+    def emitFrequencyParameters(self, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(baseFreq, cents, octave)
+
+
+    def graphPoints(self, event):
+        self.clearGraphSignal.emit()
+        # TODO: Fix below
+        #self.regraphSignal()
+        self.regraphSignal.emit()
+
+    def clearGraphAndPoints(self, event):
+        self.clearGraphSignal.emit()
+
 class VolumeControlsWidget(QWidget):
     volumeUpdateSignal = Signal(float)
     def __init__(self):
@@ -307,148 +782,58 @@ class LabeledWaveImageWidget(QFrame):
         #self.setStyleSheet("border: 1px solid blue")
         #self.vboxLayout.addWidget(self.image)
 
-
-class WorkspaceWidget(QWidget):
-    """
-    This is the main widget containing the main graph view 
-    (for editors and the summed signal)
-    """
-    initiateCatalogAdditionSignal = Signal(int)
+class WaveNameInputWidget(QWidget):
     createCatalogWaveSignal = Signal(str)
-    swapGraphViewSignal = Signal(int)
-    
-    playSignal = Signal(int)
-    graphSignal = Signal(int)
-    clearGraphSignal = Signal(int)
-    pointAdditionSignal = Signal(int, float, float)
-    frequencyChangedSignal = Signal(int, str, int, int)
-    sineStateChangedSignal = Signal(int, bool)
-    sineCountChangedSignal = Signal(int, int)
-    durationChangedSignal = Signal(float)
-    volumeUpdateSignal = Signal(int, float)
-
+    cancelSignal = Signal(int)
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
+        closeWindowAction = QAction("&Close Window", self, shortcut="Esc", triggered=self.closeWindowAndClearInput)
+        enterAction = QAction("&Accept Input", self, shortcut="Return", triggered=self.enterPressed)
+        self.addAction(closeWindowAction)
+        self.addAction(enterAction)
         self.maxWidth = maxWidth
         self.maxHeight = maxHeight
-        self.waveformNameInputWidget = WaveNameInputWidget(maxWidth, maxHeight)
-        self.waveformNameInputWidget.createCatalogWaveSignal.connect(self.createNewWaveformWindow)
-        self.waveformNameInputWidget.move(self.maxWidth//2, self.maxHeight//2)
-        self.waveformWidgetDict = {}
-        self.gridLayout = QGridLayout(self)
-        self.componentGraph = ComponentGraphWidget()
-        self.centralGraph = CentralGraphWidget()
-
-        self.catalogWidget = WaveformCatalogWidget()
-        self.gridLayout.addWidget(self.catalogWidget, 0, 0)
-        self.gridLayout.addWidget(self.centralGraph, 0, 1)
-
-        # Signal management
-        self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
-        self.catalogWidget.switchToMainSignal.connect(self.showCentralGraph)
-        self.catalogWidget.switchToComponentSignal.connect(self.switchToComponentGraph)
-
-        self.centralGraph.playSignal.connect(self.emitPlaySignal)
-        self.centralGraph.durationChangedSignal.connect(self.emitDurationChanged)
-
-        self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
-        self.componentGraph.playSignal.connect(self.emitPlaySignal)
-        self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
-        self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
-        self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
-        self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
-        self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
-
-    def emitVolume(self, key:int, vol:float):
-        self.volumeUpdateSignal.emit(key, vol)
-    
-    def emitDurationChanged(self, duration:float):
-        self.durationChangedSignal.emit(duration)
-
-    def showCentralGraph(self):
-        item = self.gridLayout.itemAtPosition(0, 1)
-        widget = item.widget()
-        if widget == self.componentGraph:
-            self.gridLayout.removeWidget(widget)
-            widget.hide()
-            self.gridLayout.addWidget(self.centralGraph, 0, 1)
-            self.centralGraph.setVisible(True)
-            self.catalogWidget.setToggleComponentButton()
-
-    def setDurationWidgetValue(self, duration:float):
-        self.centralGraph.setDurationWidgetValue(duration)
-
-    def switchToComponentGraph(self):
-        """
-        This is a wrapper for showComponentGraph for the signal. 
-        It just switches back to the most recent component graph 
-        index available 
-        """
-        self.showComponentGraph(self.componentGraph.getKeyIndex())
-
-    def setStopTimer(self, duration:float):
-        self.componentGraph.setStopTimer(duration)
-        self.centralGraph.setStopTimer(duration)
-
-    def emitSineStateChanged(self, keyIndex, isChecked):
-        self.sineStateChangedSignal.emit(keyIndex, isChecked)
-
-    def emitSineCountChanged(self, key, count:int):
-        self.sineCountChangedSignal.emit(key, count)
-
-    def emitClearGraphSignal(self, keyIndex):
-        self.clearGraphSignal.emit(keyIndex)
-
-    def showComponentGraph(self, keyIndex:int):
-        # Check if the centralGraph is currently in place
-        item = self.gridLayout.itemAtPosition(0, 1)
-        widget = item.widget()
-        if widget == self.centralGraph:
-            self.gridLayout.removeWidget(widget)
-            widget.hide()
-            self.componentGraph.setKeyIndex(keyIndex)
-            self.gridLayout.addWidget(self.componentGraph, 0, 1)
-            self.componentGraph.setVisible(True)
-            self.catalogWidget.setToggleMainButton()
-
+        self.move(self.maxWidth // 2, self.maxHeight // 2)
+        self.formLayout = QFormLayout(self)
+        self.userInput = QLineEdit()
+        self.formLayout.addRow("Enter waveform name:", self.userInput)
+        self.ok = QPushButton("Ok")
+        self.cancel = QPushButton("Cancel")
+        self.okCancelComplex = QWidget()
+        self.errorLabel = QLabel()
+        self.errorLabel.setStyleSheet("color: #ff0000")
+        self.hboxLayout = QHBoxLayout(self.okCancelComplex)
+        self.hboxLayout.addWidget(self.ok)
+        self.hboxLayout.addWidget(self.cancel)
+        self.formLayout.addRow(self.okCancelComplex)
+        self.formLayout.addRow(self.errorLabel)
+        self.ok.clicked.connect(self.okClicked)
+        self.cancel.clicked.connect(lambda e: self.cancelSignal.emit(e))
+    def enterPressed(self, event):
+        if self.cancel.hasFocus():
+            self.closeWindowAndClearInput()
+        else:
+            self.okClicked(event)
+    def okClicked(self, event):
+        if len(self.userInput.text()) == 0:
+            self.errorLabel.setText("Need to supply a name for new waveform")
+        else:
+            name = self.userInput.text()
+            self.createCatalogWaveSignal.emit(name)
+    def deleteUserInput(self):
+        self.userInput.setText("")
+    def getName(self):
+        return self.userInput.text()
+    def closeWindowAndClearInput(self):
+        self.clearTextFields()
+        self.setVisible(False)
+    def clearTextFields(self):
+        self.userInput.setText("")
+        self.errorLabel.setText("")
+    def focusInput(self):
+        self.userInput.setFocus()
     def displayDupNameErrMsg(self):
-        self.waveformNameInputWidget.displayDupNameErrMsg()
-
-    def closeWaveNameInputWidget(self):
-        self.waveformNameInputWidget.closeWindowAndClearInput()
-
-    def emitFrequencyParameters(self, keyIndex, baseFreq, cents, octave):
-        self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
-
-    def emitCatalogWaveAddInitiate(self, event):
-        self.initiateCatalogAdditionSignal.emit(event)
-
-    def emitPlaySignal(self, index):
-        self.playSignal.emit(index)
-
-    def emitGraphSignal(self, key):
-        self.graphSignal.emit(key)
-
-    def emitPointAdditionSignal(self, key, x, y):
-        self.pointAdditionSignal.emit(key, x, y)
-
-    def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
-        # TODO: Add graph widget to catalog
-        self.componentGraph.graphPoints(x, y, interp_x, interp_y, sine_x, sine_y)
-        
-    def createNewWaveformWindow(self):
-        name = self.waveformNameInputWidget.getName()
-        self.createCatalogWaveSignal.emit(name)
-
-    def openCatalogAdditionDialog(self, key) -> bool:
-        """ Attempt to get name for waveform. If failure, return False.
-        """
-        self.waveformNameInputWidget.setVisible(True)
-        self.waveformNameInputWidget.focusInput()
-
-    def addWaveToCatalog(self, key_index:int, name:str):
-        self.catalogWidget.addWaveWidgetToCatalog(key_index, name)
-        self.waveformNameInputWidget.closeWindowAndClearInput()
+        self.errorLabel.setText("Name '{}' already exists in catalog".format(self.getName()))
 
 class WaveformCatalogWidget(QWidget):
     """
@@ -503,415 +888,3 @@ class WaveformCatalogWidget(QWidget):
         
     def emitSwapGraph(self, key_index):
         self.swapGraphSignal.emit(key_index)
-
-class GenericGraphParametersWidget(QWidget):
-    # Contains the index of the waveform
-    playSignal = Signal(int)
-    durationChangedSignal = Signal(float)
-    volumeUpdateSignal = Signal(float)
-
-    def __init__(self):
-        super().__init__()
-        self.isPlaying = False
-        self.controlLayout = QFormLayout(self)
-        self.parameterWidgetMaximumSize = QSize(350, 700)
-        self.parameterWidgetMinimumSize = QSize(30, 30)
-
-        self.volumeSlider = VolumeControlsWidget()
-
-        self.playButton = QPushButton("Play")
-        self.playButton.setMinimumSize(self.parameterWidgetMinimumSize)
-        self.playButton.setMaximumSize(QSize(100, 100))
-        #self.setMinimumSize(self.parameterWidgetMinimumSize)
-        self.setMaximumSize(QSize(250, 800))
-
-        self.durationSpin = QDoubleSpinBox()
-        self.durationSpin.setRange(1, 10)
-        self.durationSpin.setValue(3)
-        self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
-        self.durationSpin.valueChanged.connect(self.emitDurationChanged)
-
-        self.playButton.clicked.connect(self.playWaveform)
-        self.volumeSlider.volumeUpdateSignal.connect(self.emitVolume)
-
-        self.controlLayout.addRow("Volume:", self.volumeSlider)
-        self.controlLayout.addRow("Duration:", self.durationSpin)
-        self.controlLayout.addRow("", self.playButton)
-    
-    def setDurationWidgetValue(self, duration: float):
-        self.durationSpin.setValue(duration)
-
-    def emitDurationChanged(self):
-        self.durationChangedSignal.emit(self.durationSpin.value())
-
-    def emitVolume(self, vol:float):
-        self.volumeUpdateSignal.emit(vol)
-
-    def playWaveform(self, event):
-        self.playSignal.emit(0)
-
-    def setStopTimer(self, duration:float):
-        self.playTimer = QTimer()
-        self.playTimer.timeout.connect(self.resetPlayButton)
-        self.playTimer.start(int(duration * 1000))
-        self.playButton.setText("Stop")
-        self.playButton.clicked.connect(self.resetPlayButton)
-    
-    def resetPlayButton(self):
-        self.playButton.setText("Play")
-        self.stopAudioSignal.emit()
-        self.playButton.clicked.connect(self.playWaveform)
-
-class GraphParametersWidget(GenericGraphParametersWidget):
-    regraphSignal = Signal()
-    clearGraphSignal = Signal()
-    frequencyChangedSignal = Signal(str, int, int)
-    sineStateChangedSignal = Signal(bool)
-    sineCountChangedSignal = Signal(int)
-
-    def __init__(self):
-        super().__init__()
-
-        self.clearButton = QPushButton("Clear")
-        self.clearButton.setMinimumSize(self.parameterWidgetMinimumSize)
-        self.clearButton.setMaximumSize(self.parameterWidgetMaximumSize)
-        self.clearButton.clicked.connect(self.clearGraphAndPoints)
-
-
-        self.sineInterpolatorWidget = SineInterpolatorWidget()
-        self.sineInterpolatorWidget.setMinimumSize(self.parameterWidgetMinimumSize)
-        self.sineInterpolatorWidget.setMaximumSize(self.parameterWidgetMaximumSize)
-        self.frequencyWidget = FrequencyWidget()
-
-        self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
-        self.controlLayout.addRow("Freq:", self.frequencyWidget)
-        self.controlLayout.addRow("", self.clearButton)
-        self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
-        self.controlLayout.setSpacing(10)
-        self.controlLayout.setContentsMargins(0, 0, 0, 0)
-
-        self.controlLayout.removeRow(1)
-
-        # Slots and Signals
-        self.sineInterpolatorWidget.changedSignal.connect(self.emitSineStateChanged)
-        self.sineInterpolatorWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
-        self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
-
-    def emitSineCountChanged(self, count):
-        self.sineCountChangedSignal.emit(count)
-
-    def emitSineStateChanged(self, isChecked):
-        self.sineStateChangedSignal.emit(isChecked)
-
-    def emitFrequencyParameters(self, baseFreq, cents, octave):
-        self.frequencyChangedSignal.emit(baseFreq, cents, octave)
-
-
-    def graphPoints(self, event):
-        self.clearGraphSignal.emit()
-        # TODO: Fix below
-        #self.regraphSignal()
-        self.regraphSignal.emit()
-
-    def clearGraphAndPoints(self, event):
-        self.clearGraphSignal.emit()
-
-class CentralGraphWidget(QWidget):
-    playSignal = Signal(int)
-    durationChangedSignal = Signal(float)
-
-    def __init__(self):
-        super().__init__()
-        self.isPlaying = False
-        self.gridLayout = QGridLayout(self)
-        self.graphParametersWidget = GenericGraphParametersWidget()
-
-        self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(0))
-        self.window = pg.GraphicsLayoutWidget()
-        self.graph = self.window.addPlot(title="Global Graph", row=0, col=0)
-
-        self.vertical = pg.InfiniteLine(angle=90, movable=False, pen="#00ccff")
-        self.horizontal = pg.InfiniteLine(angle=0, movable=False, pen="#00ccff")
-        
-        self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
-        self.gridLayout.addWidget(self.window, 0, 1)
-
-        self.graphParametersWidget.durationChangedSignal.connect(self.emitDurationChanged)
-
-    def setDurationWidgetValue(self, duration: float):
-        self.graphParametersWidget.setDurationWidgetValue(duration)
-
-    def emitDurationChanged(self, duration):
-        self.durationChangedSignal.emit(duration)
-
-    def setStopTimer(self, duration:float):
-        self.graphParametersWidget.setStopTimer(duration)
-
-
-class ComponentGraphWidget(QWidget):
-    pointAdditionSignal = Signal(int, float, float)
-    playSignal = Signal(int)
-    graphSignal = Signal(int)
-    clearGraphSignal = Signal(int)
-    regraphSignal = Signal(int)
-    # Throw the index in as well 
-    frequencyChangedSignal = Signal(int, str, int, int)
-    sineStateChangedSignal = Signal(int, bool)
-    sineCountChangedSignal = Signal(int, int)
-    volumeUpdateSignal = Signal(int, float)
-
-    def __init__(self):
-        super().__init__()
-        self.isPlaying = False
-        self.keyIndex = 0
-        self.seed = np.array([])
-        self.points = []
-        self.gridLayout = QGridLayout(self)
-        self.window = pg.GraphicsLayoutWidget()
-        #self.amplitudeEnvelope = self.window.addPlot(title="Amplitude Envelope", row=0, col=0)
-        #self.frequencyEnvelope = self.window.addPlot(title="Frequency Envelope", row=1, col=0)
-        self.oscillator = self.window.addPlot(title="Oscillator", row=2, col=0)
-        #self.graph2 = self.window.addPlot(title="Frequency Env", row=0, col=0)
-        self.oscillator.setXRange(0, 1)
-        self.oscillator.setYRange(-1, 1)
-        self.viewBox = self.oscillator.vb
-        self.vertical = pg.InfiniteLine(angle=90, movable=False, pen="#00ccff")
-        self.horizontal = pg.InfiniteLine(angle=0, movable=False, pen="#00ccff")
-        self.oscillator.addItem(self.vertical)
-        self.oscillator.addItem(self.horizontal)
-        self.mouseMovedProxy = pg.SignalProxy(self.oscillator.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)
-        # Prevent dragging
-        self.oscillator.setLimits(xMin=0, xMax=1, yMin=-1, yMax=1)
-
-        # Connect to self.addPoint
-        self.mouseClickedProxy = pg.SignalProxy(self.oscillator.scene().sigMouseClicked, rateLimit=120, slot=self.addPoint)
-
-        self.oscillator.showGrid(True, True, .5)
-
-        self.plotPen = pg.mkPen("#0099bb", width=2)
-        self.sineInterpolatedPen = pg.mkPen("#ff0000", width=2)
-        self.linearInterpolatedPen = pg.mkPen("#ff00ff", width=2)
-
-        self.scatterPen = pg.mkPen("#aa0000", width=2)
-
-        self.graphParametersWidget = GraphParametersWidget()
-
-        self.graphParametersWidget.regraphSignal.connect(self.graphPoints)
-        self.graphParametersWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
-        self.graphParametersWidget.playSignal.connect(self.emitPlaySignal)
-        self.graphParametersWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
-        self.graphParametersWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
-        self.graphParametersWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
-        self.graphParametersWidget.volumeUpdateSignal.connect(self.emitVolume)
-
-        self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
-        self.gridLayout.addWidget(self.window, 0, 1)
-        #self.gridLayout.setSpacing(0)
-        #self.gridLayout.setContentsMargins(0, 0, 0, 0)
-
-    def getKeyIndex(self):
-        return self.keyIndex
-
-    def setStopTimer(self, duration:float):
-        self.graphParametersWidget.setStopTimer(duration)
-
-    def emitVolume(self, vol:float):
-        self.volumeUpdateSignal.emit(self.keyIndex, vol)
-
-    def emitSineCountChanged(self, count):
-        self.sineCountChangedSignal.emit(self.keyIndex, count)
-
-    def emitSineStateChanged(self, isChecked:bool):
-        self.sineStateChangedSignal.emit(self.keyIndex, isChecked)
-
-    def emitFrequencyParameters(self, baseFreq, cents, octave):
-        self.frequencyChangedSignal.emit(self.keyIndex, baseFreq, cents, octave)
-
-    def emitPlaySignal(self):
-        self.playSignal.emit(self.keyIndex)
-
-    def emitClearGraphSignal(self):
-        self.clearGraph()
-        self.clearGraphSignal.emit(self.keyIndex)
-
-    def setKeyIndex(self, keyIndex):
-        self.keyIndex = keyIndex
-
-    def calculateSeed(self, points):
-        """
-        ASSUMPTION: points is an unzippable nx2 matrix sorted by the left column
-        """
-        if len(points) < 2:
-            return np.array([])
-        x, y = zip(*points)
-        new_x = np.linspace(x[0], x[-1], len(x))
-        seed = np.interp(new_x, x, y)
-        return seed 
-
-    def addPoint(self, event):
-        click_event, = event
-        scenePos = click_event.scenePos()
-        if self.viewBox.sceneBoundingRect().contains(click_event.scenePos()):
-            plotPosition = self.viewBox.mapSceneToView(scenePos)
-            self.pointAdditionSignal.emit(self.keyIndex, plotPosition.x(), plotPosition.y())
-
-    def clearGraphAndPoints(self):
-        self.points = []
-        self.clearGraph()
-
-    def clearGraph(self):
-        self.oscillator.clear()
-        self.oscillator.addItem(self.vertical)
-        self.oscillator.addItem(self.horizontal)
-
-
-    def plot(self, x, y, pen=None):
-        self.oscillator.plot(x, y, pen=pen)
-
-    def scatterPlot(self, x, y, pen=None):
-        self.oscillator.scatterPlot(x, y, pen=pen)
-
-    def graphPoints(self, x, y, interp_x, interp_y, sine_x, sine_y):
-        self.clearGraph()
-        #x, y = zip(*self.points)
-        self.oscillator.plot(x, y, pen=self.plotPen)
-        self.oscillator.scatterPlot(x, y, pen=self.scatterPen)
-        self.oscillator.scatterPlot(interp_x, interp_y, pen=self.sineInterpolatedPen)
-        self.oscillator.plot(interp_x, interp_y, pen=self.linearInterpolatedPen)
-        self.oscillator.plot(sine_x, sine_y, pen=self.sineInterpolatedPen)
-        #new_x = np.linspace(x[0], x[-1], 2 * len(x))
-        """self.seed = np.interp(new_x, x, y)
-        self.oscillator.scatterPlot(new_x, self.seed, pen=self.sineInterpolatedPen)
-        self.oscillator.plot(new_x, self.seed, pen=self.linearInterpolatedPen)
-        if self.sineInterpolatorWidget.isChecked():
-            # Need to make evenly spaced xs 
-            if len(x) >= 2:
-                duration = new_x[-1] - new_x[0]
-                amplitude = np.max(np.abs(self.seed))
-                sine_count = self.sineInterpolatorWidget.sineCount()
-                t = np.linspace(new_x[0], new_x[-1], int(duration * waveform.SAMPLE_RATE))
-                wave = waveform.seeded_waveform(amplitude, duration, 1 / duration, self.seed, waveform.SAMPLE_RATE, sine_count)
-                self.oscillator.plot(t, wave.T[0], pen=self.sineInterpolatedPen)
-        """
-
-    def playWaveform(self):
-        if self.isPlaying:
-            self.effect.stop()
-        if len(self.points) < 2:
-            return
-        frequency = self.getFrequency()
-        duration = self.getDuration()
-        volume = self.getVolume()
-        if self.sineInterpolatorWidget.isChecked():
-            sine_count = self.sineInterpolatorWidget.sineCount()
-            self.wave = volume * waveform.seeded_waveform(1, duration, frequency, self.seed, waveform.SAMPLE_RATE, sine_count)
-        else:
-            x, y = zip(*self.points)
-            x = np.array(x)
-            y = np.array(y)
-            wavelength_sample_count = int(waveform.SAMPLE_RATE / frequency)
-            t_base = np.linspace(0, x[-1] - x[0], wavelength_sample_count)
-            duration_sample_count = int(waveform.SAMPLE_RATE * duration)
-            t_indices = np.linspace(0, duration_sample_count, duration_sample_count).astype(int)
-            t_modulo = t_indices % wavelength_sample_count
-            y_interp = np.interp(t_base, x, y)
-            y_interp /= np.max(np.abs(y_interp), axis=0)
-            self.wave = volume * y_interp[t_modulo]
-
-        self.effect = waveform.play(self.wave)
-        self.effect.play()
-        self.playTimer = QTimer()
-        self.playTimer.timeout.connect(self.resetPlayButton)
-        self.playTimer.start(int(duration * 1000))
-        self.playButton.setText("Stop")
-        self.isPlaying = True
-
-    def resetPlayButton(self):
-        self.playButton.setText("Play")
-        self.isPlaying = False
-
-    def getVolume(self):
-        return self.volumeSlider.getVolume()
-
-    def getFrequency(self):
-        return self.frequencyWidget.getFrequency()
-
-    def getDuration(self):
-        return self.durationSpin.value()
-
-    def getPoints(self):
-        return list(zip(*self.points))
-
-    def setPoints(self, points):
-        self.points = points
-
-    def mouseMoved(self, event):
-        """
-        Draw vertical and horizontal lines at the cursor position
-        """
-        pos = event[0]
-        if self.oscillator.sceneBoundingRect().contains(pos):
-            mousePoint = self.oscillator.vb.mapSceneToView(pos)
-            self.vertical.setPos(mousePoint.x())
-            self.horizontal.setPos(mousePoint.y())
-
-    def plot(self, t, waveform):
-        hPen = pg.mkPen("#0099bb", width=3)
-        self.oscillator.plot(t, waveform, pen=hPen)
-        #self.oscillator.setMinimumWidth(self.graphWidget.height())
-
-    def clear(self):
-        self.oscillator.clear()
-
-class WaveNameInputWidget(QWidget):
-    createCatalogWaveSignal = Signal(str)
-    cancelSignal = Signal(int)
-    def __init__(self, maxWidth, maxHeight):
-        super().__init__()
-        closeWindowAction = QAction("&Close Window", self, shortcut="Esc", triggered=self.closeWindowAndClearInput)
-        enterAction = QAction("&Accept Input", self, shortcut="Return", triggered=self.enterPressed)
-        self.addAction(closeWindowAction)
-        self.addAction(enterAction)
-        self.maxWidth = maxWidth
-        self.maxHeight = maxHeight
-        self.move(self.maxWidth // 2, self.maxHeight // 2)
-        self.formLayout = QFormLayout(self)
-        self.userInput = QLineEdit()
-        self.formLayout.addRow("Enter waveform name:", self.userInput)
-        self.ok = QPushButton("Ok")
-        self.cancel = QPushButton("Cancel")
-        self.okCancelComplex = QWidget()
-        self.errorLabel = QLabel()
-        self.errorLabel.setStyleSheet("color: #ff0000")
-        self.hboxLayout = QHBoxLayout(self.okCancelComplex)
-        self.hboxLayout.addWidget(self.ok)
-        self.hboxLayout.addWidget(self.cancel)
-        self.formLayout.addRow(self.okCancelComplex)
-        self.formLayout.addRow(self.errorLabel)
-        self.ok.clicked.connect(self.okClicked)
-        self.cancel.clicked.connect(lambda e: self.cancelSignal.emit(e))
-    def enterPressed(self, event):
-        if self.cancel.hasFocus():
-            self.closeWindowAndClearInput()
-        else:
-            self.okClicked(event)
-    def okClicked(self, event):
-        if len(self.userInput.text()) == 0:
-            self.errorLabel.setText("Need to supply a name for new waveform")
-        else:
-            name = self.userInput.text()
-            self.createCatalogWaveSignal.emit(name)
-    def deleteUserInput(self):
-        self.userInput.setText("")
-    def getName(self):
-        return self.userInput.text()
-    def closeWindowAndClearInput(self):
-        self.clearTextFields()
-        self.setVisible(False)
-    def clearTextFields(self):
-        self.userInput.setText("")
-        self.errorLabel.setText("")
-    def focusInput(self):
-        self.userInput.setFocus()
-    def displayDupNameErrMsg(self):
-        self.errorLabel.setText("Name '{}' already exists in catalog".format(self.getName()))

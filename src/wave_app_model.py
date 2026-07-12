@@ -17,7 +17,7 @@ class WaveModel:
         self.amp_str = "amplitude"
         self.sine_count_str = "sine_count"
         self.sine_checked_str = "sine_checked"
-        self.duration = 5
+        self.duration = 2
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
         self.combined_wave = np.zeros_like(self.t)
@@ -85,7 +85,7 @@ class WaveModel:
                     self.subtractWaveFromCombined(key)
                 else:
                     self.isPreviouslyCombined = True    
-                wave = self.getWave(key, recalculate=True)
+                wave = self.getComponentWave(key, recalculate=True)
                 self.combined_wave += wave
 
 
@@ -99,7 +99,7 @@ class WaveModel:
 
 
     def subtractWaveFromCombined(self, keyIndex):
-        subtracting_wave = self.getWave(keyIndex)
+        subtracting_wave = self.getComponentWave(keyIndex)
         self.combined_wave -= subtracting_wave
 
     def updateVolume(self, key:int, vol:float):
@@ -112,7 +112,7 @@ class WaveModel:
             self.waveDict[key][self.sine_extrap_str] *= vol / current_vol
         else:
             # Just using this to decide which one to recalculate
-            self.getWave(key, recalculate=True)
+            self.getComponentWave(key, recalculate=True)
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
@@ -184,7 +184,7 @@ class WaveModel:
     def getSampleRate(self):
         return self.sample_rate
 
-    def getWave(self, key:int, recalculate=False):
+    def getComponentWave(self, key:int, recalculate=False):
         """
         Generate wave based on checked status
         """
@@ -193,6 +193,17 @@ class WaveModel:
         else:
             wave = self.getExtrapolatedWave(key, recalculate=recalculate)
         return wave
+
+    def getPlayableComponentWave(self, key:int, recalculate=True):
+        """
+        Normalize and fade out the end slightly
+        """
+        wave = self.getComponentWave(key, recalculate=recalculate)
+        wave /= np.max(np.abs(wave), axis=0)
+        #wave = np.concatenate([wave, np.zeros(int(self.getSampleRate() * .1))])
+        wave = waveform.fade_out(wave, .001, self.getSampleRate())
+        return wave
+
 
     def calculateExtrapolatedWave(self, key):
         wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
