@@ -205,8 +205,8 @@ class WaveView(QMainWindow):
     def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
         self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
 
-    def graphCombinedWave(self, t, wave):
-        self.workspaceWidget.graphCombinedWave(t, wave)
+    def graphCombinedWave(self, t, wave, sample_rate):
+        self.workspaceWidget.graphCombinedWave(t, wave, sample_rate)
 
     def openCatalogAdditionDialog(self, key) -> bool:
         self.workspaceWidget.openCatalogAdditionDialog(key)
@@ -363,8 +363,8 @@ class WorkspaceWidget(QWidget):
     def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
         self.componentGraph.graphPoints(x, y, interp_x, interp_y, sine_x, sine_y)
 
-    def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray):
-        self.centralGraph.graphCombinedWave(t, wave)
+    def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray, sample_rate:int):
+        self.centralGraph.graphCombinedWave(t, wave, sample_rate)
         
     def createNewWaveformWindow(self):
         name = self.waveformNameInputWidget.getName()
@@ -411,10 +411,11 @@ class CentralGraphWidget(QWidget):
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
 
-    def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray):
+    def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray, sample_rate:int):
+        # TODO: Can the sample_rate be safely assumed to be larger than 0?
         self.clearGraph()
         self.graph.plot(t, wave, pen=self.pen)
-        self.graph.setLimits(xMin=0, xMax=10, yMin=np.min(wave), yMax=np.max(wave))
+        self.graph.setLimits(xMin=0, xMax=wave.shape[0] / sample_rate, yMin=np.min(wave), yMax=np.max(wave))
 
     def mouseMoved(self, event):
         """
