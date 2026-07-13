@@ -200,10 +200,14 @@ class WaveModel:
         return wave
 
     def calculatePlayableWave(self, wave:np.ndarray) -> np.ndarray:
-        wave /= np.max(np.abs(wave), axis=0)
+        amp_max = np.max(np.abs(wave), axis=0)
+        if amp_max > 0:
+            new_wave = wave / amp_max
+        else:
+            return wave
         if len(wave.shape) == 1:
-            wave = np.array([wave, wave]).T
-        fade_out = waveform.fade_out(wave, .005, self.sample_rate)
+            new_wave = np.array([new_wave, new_wave]).T
+        fade_out = waveform.fade_out(new_wave, .005, self.sample_rate)
         fade_in = waveform.fade_in(fade_out, .001, self.sample_rate)
         return fade_in
 

@@ -9,7 +9,13 @@ import os
 from PySide6 import QtCore
 from PySide6.QtCore import QUrl, QSize, QTimer, Signal
 from PySide6.QtGui import QAction, QImage
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, QFrame, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSizePolicy, QSlider, QToolBar, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, 
+    QFrame, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, 
+    QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, 
+    QScrollArea, QSpinBox, QSizePolicy, QSlider, QToolBar, QVBoxLayout, 
+    QWidget
+)
 import waveform
 
 import pyqtgraph as pg
@@ -601,6 +607,7 @@ class GenericGraphParametersWidget(QWidget):
         self.controlLayout = QFormLayout(self)
         self.parameterWidgetMaximumSize = QSize(350, 700)
         self.parameterWidgetMinimumSize = QSize(30, 30)
+        self.playTimer = QTimer()
 
         self.volumeSlider = VolumeControlsWidget()
 
@@ -627,7 +634,6 @@ class GenericGraphParametersWidget(QWidget):
         self.durationSpin.setValue(duration)
 
     def setStopTimer(self, duration:float):
-        self.playTimer = QTimer()
         self.playTimer.setSingleShot(True)
         self.playTimer.timeout.connect(self.resetPlayButton)
         self.playTimer.start(int(round(duration * 1000)))
@@ -645,6 +651,7 @@ class GenericGraphParametersWidget(QWidget):
             self.playButton.setText("Stop")
         else:
             self.stopAudioSignal.emit()
+            self.playTimer
             self.resetPlayButton()
 
     def resetPlayButton(self):
@@ -851,6 +858,7 @@ class WaveNameInputWidget(QWidget):
         self.formLayout.addRow(self.errorLabel)
         self.ok.clicked.connect(self.okClicked)
         self.cancel.clicked.connect(lambda e: self.cancelSignal.emit(e))
+
     def enterPressed(self, event):
         if self.cancel.hasFocus():
             self.closeWindowAndClearInput()
@@ -896,10 +904,10 @@ class WaveformCatalogWidget(QWidget):
         self.addWaveButton.setMaximumSize(QSize(100, 100))
         self.toggleGraphButton = QPushButton("Component")
 
-        self.vboxLayout.addWidget(self.toggleGraphButton)
-        self.vboxLayout.addWidget(self.catalogSection)
-        self.vboxLayout.addWidget(self.addWaveButton)
+        self.vboxLayout.insertWidget(-1, self.toggleGraphButton)
         self.vboxLayout.addStretch()
+        self.vboxLayout.insertWidget(-1, self.catalogSection)
+        self.vboxLayout.insertWidget(-1, self.addWaveButton)
 
         # Signals 
         self.addWaveButton.clicked.connect(self.emitInititateAddCatalogWave)
@@ -915,9 +923,12 @@ class WaveformCatalogWidget(QWidget):
         self.toggleGraphButton.setText("Component")
 
     def addWaveWidgetToCatalog(self, keyIndex, name:str):
+        widget = LabeledWaveImageWidget(name)
         self.labeledWavesDict[keyIndex] = {
             "name": name,
+            "widget": widget
         }
+        self.vboxLayout.addWidget(widget)
         self.emitSwapGraphs(keyIndex)
         
     def emitSwapGraphs(self, keyIndex):
