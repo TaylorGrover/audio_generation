@@ -29,9 +29,6 @@ class WaveController:
         # Set the view's duration button based on the model
         self.view.setDurationWidgetValue(self.model.getDuration())
 
-        # Set initial wave
-        self.wave = np.zeros(int(self.model.getDuration() * self.model.getSampleRate()))
-
         # TODO: Decide between initializing the model parameters based on the view defaults or vice versa.
         
 
@@ -128,14 +125,18 @@ class WaveController:
 
     def playCurrentWaveform(self, key):
         if key == 0: # This might be bad design, but the zero index is the global view
-            self.wave = self.model.getPlayableCombinedWave()
+            wave = self.model.getPlayableCombinedWave()
         else:
+            # To play specific component
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
-                self.wave = self.model.getPlayableComponentWave(key, recalculate=True)
+                wave = self.model.getPlayableComponentWave(key, recalculate=True)
+            else:
+                return
         duration = self.model.getDuration()
-        self.view.setStopTimer(duration)
-        self.soundPlayer.play(self.wave, self.model.getSampleRate())
+        self.view.setStopTimer(duration + .006) # TODO: Fix later
+        self.view.setCurrentlyPlayingStatus()
+        self.soundPlayer.play(wave, self.model.getSampleRate())
 
     def stopAudio(self):
         self.soundPlayer.stop()

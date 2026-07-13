@@ -70,6 +70,9 @@ class WaveView(QMainWindow):
         self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
         self.workspaceWidget.stopAudioSignal.connect(self.emitStopAudioSignal)
 
+    def setCurrentlyPlayingStatus(self):
+        self.workspaceWidget.setCurrentlyPlayingStatus()
+
     def maximize(self):
         if self.maximized:
             self.showNormal()
@@ -268,6 +271,10 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
 
+    def setCurrentlyPlayingStatus(self):
+        self.componentGraph.setCurrentlyPlayingStatus()
+        self.centralGraph.setCurrentlyPlayingStatus()
+
     def swapGraphs(self):
         # Only swap graphs if the current component index is >0,
         # as this implies there actually exists a component wave
@@ -381,7 +388,6 @@ class CentralGraphWidget(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.isPlaying = False
         self.gridLayout = QGridLayout(self)
         self.graphParametersWidget = GenericGraphParametersWidget()
         self.pen = pg.mkPen("#ff3300", width=3)
@@ -401,6 +407,9 @@ class CentralGraphWidget(QWidget):
 
         self.graphParametersWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
+    
+    def setCurrentlyPlayingStatus(self):
+        self.graphParametersWidget.setCurrentlyPlayingStatus()
 
     def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray):
         self.clearGraph()
@@ -453,7 +462,6 @@ class ComponentGraphWidget(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.isPlaying = False
         self.keyIndex = 0
         self.seed = np.array([])
         self.points = []
@@ -500,6 +508,9 @@ class ComponentGraphWidget(QWidget):
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def setCurrentlyPlayingStatus(self):
+        self.graphParametersWidget.setCurrentlyPlayingStatus()
 
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
@@ -623,12 +634,16 @@ class GenericGraphParametersWidget(QWidget):
         self.durationSpin.setMaximumSize(self.parameterWidgetMaximumSize)
         self.durationSpin.valueChanged.connect(self.emitDurationChanged)
 
-        self.playButton.clicked.connect(self.playWaveform)
+        self.playButton.clicked.connect(self.emitPlayButtonSignal)
         self.volumeSlider.volumeUpdateSignal.connect(self.emitVolume)
 
         self.controlLayout.addRow("Volume:", self.volumeSlider)
         self.controlLayout.addRow("Duration:", self.durationSpin)
         self.controlLayout.addRow("", self.playButton)
+
+    def setCurrentlyPlayingStatus(self):
+        self.isPlaying = True
+        self.playButton.setText("Stop")
     
     def setDurationWidgetValue(self, duration: float):
         self.durationSpin.setValue(duration)
@@ -644,14 +659,17 @@ class GenericGraphParametersWidget(QWidget):
     def emitVolume(self, vol:float):
         self.volumeUpdateSignal.emit(vol)
 
-    def playWaveform(self, event):
+    def emitPlayButtonSignal(self, event):
+        """
+        For various reasons, the track may not be playable, 
+        so the bool should be set by the controller. In any case,
+        emit the correct signal based on whether it is playing.
+        """
         if not self.isPlaying:
             self.playSignal.emit(0)
-            self.isPlaying = True
-            self.playButton.setText("Stop")
         else:
             self.stopAudioSignal.emit()
-            self.playTimer
+            self.playTimer.stop()
             self.resetPlayButton()
 
     def resetPlayButton(self):

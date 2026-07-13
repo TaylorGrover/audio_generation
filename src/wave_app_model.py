@@ -17,7 +17,7 @@ class WaveModel:
         self.amp_str = "amplitude"
         self.sine_count_str = "sine_count"
         self.sine_checked_str = "sine_checked"
-        self.duration = 2
+        self.duration = 1
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
         self.combined_wave = np.zeros_like(self.t)
@@ -96,6 +96,7 @@ class WaveModel:
         self.waveDict[keyIndex][self.sine_interp_str] *= 0
         self.waveDict[keyIndex][self.sine_extrap_str] *= 0
         self.waveDict[keyIndex][self.linear_extrap_str] *= 0
+        print(self.waveDict[keyIndex])
 
 
     def subtractWaveFromCombined(self, keyIndex):
