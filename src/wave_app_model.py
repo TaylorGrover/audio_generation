@@ -22,15 +22,16 @@ class WaveModel:
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
         self.combined_wave = np.zeros_like(self.t)
         self.isPreviouslyCombined = False
-
+    
     def createEmptyWave(self, key_index:int, name:str):
+        initial_samples = int(self.duration * self.sample_rate)
         self.waveDict[key_index] = {
             self.name_key_str: name
             , self.point_key_str: []
             , self.linear_interp_str: np.array([[]])
             , self.sine_interp_str: np.array([])
-            , self.sine_extrap_str: np.array([])
-            , self.linear_extrap_str: np.array([])
+            , self.sine_extrap_str: np.zeros(initial_samples)
+            , self.linear_extrap_str: np.zeros(initial_samples)
             , self.amp_str: 1.0
             , self.freq_str: waveform.F
             , self.sine_count_str: 8
@@ -96,24 +97,19 @@ class WaveModel:
         self.waveDict[keyIndex][self.sine_interp_str] *= 0
         self.waveDict[keyIndex][self.sine_extrap_str] *= 0
         self.waveDict[keyIndex][self.linear_extrap_str] *= 0
-        print(self.waveDict[keyIndex])
-
 
     def subtractWaveFromCombined(self, keyIndex):
-        subtracting_wave = self.getComponentWave(keyIndex)
+        subtracting_wave = self.getComponentWave(keyIndex, recalculate=False)
         self.combined_wave -= subtracting_wave
 
     def updateVolume(self, key:int, vol:float):
         """
-        TODO: Ensure this isn't needlessly expensive
+        TODO: Just update the global wave first and then set the volume 
+        parameter
         """
-        current_vol = self.getAmplitude(key)
+        self.subtractWaveFromCombined(key)
         self.waveDict[key][self.amp_str] = vol
-        if current_vol > 0:
-            self.waveDict[key][self.sine_extrap_str] *= vol / current_vol
-        else:
-            # Just using this to decide which one to recalculate
-            self.getComponentWave(key, recalculate=True)
+        print(vol)
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
@@ -122,20 +118,27 @@ class WaveModel:
         self.waveDict[key][self.linear_interp_str] = np.array([new_x, new_y]).T
 
     def updateSineInterpolationChecked(self, key:int, isChecked):
+        self.subtractWaveFromCombined(key)
         self.waveDict[key][self.sine_checked_str] = isChecked
-        self.updateCombinedWaveComponent(key)
+        self.combined_wave += self.getComponentWave(key, recalculate=True)
 
+    def updateFrequency(self, key, baseFreq, cents, octave):
+        # TODO: This should just subtract from the global wave
+        self.subtractWaveFromCombined(key)
+        self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
+        wave = self.getComponentWave(key, recalculate=True)
+        self.combined_wave += wave
+        
     def updateSineCount(self, key:int, count:int):
         # Only add back to the combined wave if currently a sine wave
         isChecked = self.getChecked(key)
         if isChecked:
-            component = copy.copy(self.getSineExtrapolatedWave(key, recalculate=False))
-            self.combined_wave -= component
+            self.subtractWaveFromCombined(key)
         self.waveDict[key][self.sine_count_str] = count
         self.updateSineInterpolation(key)
         self.calculateSineExtrapolatedWave(key)
         if isChecked:
-            self.combined_wave += self.getSineExtrapolatedWave(key)
+            self.combined_wave += self.getComponentWave(key, False)
 
     def updateSineInterpolation(self, key:int):
         x, y = self.getInterpolatedXY(key)
@@ -152,10 +155,6 @@ class WaveModel:
             , sine_count=sine_count
         ).T[0]
         self.waveDict[key][self.sine_interp_str] = np.array([sine_time, wave])
-
-    def updateFrequency(self, key, baseFreq, cents, octave):
-        self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
-        self.calculateCombinedWave(recalculate=True)
 
     def updateDuration(self, duration:float):
         self.duration = duration
@@ -190,7 +189,7 @@ class WaveModel:
             wave = self.getSineExtrapolatedWave(key, recalculate=recalculate)
         else:
             wave = self.getExtrapolatedWave(key, recalculate=recalculate)
-        return wave
+        return self.getAmplitude(key) * wave
 
     def getPlayableComponentWave(self, key:int, recalculate=True):
         """
@@ -198,13 +197,14 @@ class WaveModel:
         """
         wave = self.getComponentWave(key, recalculate=recalculate)
         wave = self.calculatePlayableWave(wave)
-        return wave
+        return self.getAmplitude(key) * wave
 
     def calculatePlayableWave(self, wave:np.ndarray) -> np.ndarray:
         amp_max = np.max(np.abs(wave), axis=0)
         if amp_max > 0:
             new_wave = wave / amp_max
         else:
+            # It's all zeros
             return wave
         if len(wave.shape) == 1:
             new_wave = np.array([new_wave, new_wave]).T
@@ -222,7 +222,8 @@ class WaveModel:
         t_modulo = t_indices % wavelength_sample_count
         y_interp = np.interp(t_base, x, y)
         y_interp /= np.max(np.abs(y_interp), axis=0)
-        wave = self.getAmplitude(key) * y_interp[t_modulo]
+        wave = y_interp[t_modulo]
+        wave = self._normalize(wave)
         self.waveDict[key][self.linear_extrap_str] = wave
 
     def getExtrapolatedWave(self, key, recalculate=False):
@@ -234,12 +235,18 @@ class WaveModel:
         return self.waveDict[key][self.linear_extrap_str]
 
     def calculateSineExtrapolatedWave(self, key):
-        volume = self.getAmplitude(key)
         frequency = self.getFrequency(key)
         sine_count = self.getSineCount(key)
         x, y = self.getInterpolatedXY(key)
-        wave = volume * waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
+        wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
+        wave = self._normalize(wave)
         self.waveDict[key][self.sine_extrap_str] = wave
+
+    def _normalize(self, wave:np.ndarray):
+        max_amp = np.max(np.abs(wave), axis=0)
+        if max_amp > 0:
+            wave /= max_amp
+        return wave
 
     def getSineExtrapolatedWave(self, key, recalculate=False):
         """
@@ -250,6 +257,9 @@ class WaveModel:
         return self.waveDict[key][self.sine_extrap_str]
 
     def calculateCombinedWave(self, recalculate=False):
+        """
+        TODO: Decide if this can be used to subtract old wave before updating the new one
+        """
         self.combined_wave = np.zeros_like(self.t)
         for keyIndex in self.waveDict:
             if recalculate:
@@ -274,4 +284,3 @@ class Project:
     def __init__(self, project_name:str):
         self.project_name = project_name
         self.wave_catalog = dict()
-    

@@ -942,13 +942,13 @@ class WaveformCatalogWidget(QWidget):
         self.toggleGraphButton.setText("Component")
 
     def addWaveWidgetToCatalog(self, keyIndex, name:str):
-        widget = LabeledWaveImageWidget(name)
+        button = QPushButton(name)
         self.labeledWavesDict[keyIndex] = {
             "name": name,
-            "widget": widget
+            "widget": button 
         }
-        self.vboxLayout.addWidget(widget)
+        self.vboxLayout.addWidget(button)
         self.emitSwapGraphs(keyIndex)
-        
+
     def emitSwapGraphs(self, keyIndex):
         self.swapGraphsSignal.emit(keyIndex)

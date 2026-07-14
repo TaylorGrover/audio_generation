@@ -107,21 +107,26 @@ class WaveController:
         # Get next available key
         self.view.openCatalogAdditionDialog(event)
 
-    def updateVolume(self, keyIndex:int, vol:float):
-        self.model.updateVolume(keyIndex, vol)
+    def updateVolume(self, key:int, vol:float):
+        self.model.updateVolume(key, vol)
     
     def updateSineInterpolationChecked(self, key:int, isChecked:bool):
+        self.graphComponentWaveform(key)
+        self.graphCombinedWave()
         self.model.updateSineInterpolationChecked(key, isChecked)
 
     def updateSineCount(self, key:int, count:int):
-        self.model.updateSineCount(key, count)
         self.graphComponentWaveform(key)
-
-    def updateDuration(self, duration:float):
-        self.model.updateDuration(duration)
+        self.graphCombinedWave()
+        self.model.updateSineCount(key, count)
 
     def updateFrequency(self, keyIndex, baseFreq, cents, octave):
+        self.graphCombinedWave()
         self.model.updateFrequency(keyIndex, baseFreq, cents, octave)
+
+    # Updates all waves
+    def updateDuration(self, duration:float):
+        self.model.updateDuration(duration)
 
     def playCurrentWaveform(self, key):
         if key == 0: # This might be bad design, but the zero index is the global view
