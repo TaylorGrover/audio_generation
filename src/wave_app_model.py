@@ -56,7 +56,8 @@ class WaveModel:
         return len(self.getPoints(key))
 
     def getPointsXY(self, key):
-        return zip(*self.getPoints(key))
+        unzipped = zip(*self.getPoints(key))
+        return unzipped
 
     def getInterpolated(self, key):
         return self.waveDict[key][self.linear_interp_str]
@@ -214,17 +215,18 @@ class WaveModel:
 
 
     def calculateExtrapolatedWave(self, key):
-        wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
-        total_sample_count = int(self.duration * self.sample_rate)
-        x, y = self.getInterpolatedXY(key)
-        t_base = np.linspace(0, x[-1] - x[0], wavelength_sample_count)
-        t_indices = np.linspace(0, total_sample_count, total_sample_count).astype(int)
-        t_modulo = t_indices % wavelength_sample_count
-        y_interp = np.interp(t_base, x, y)
-        y_interp /= np.max(np.abs(y_interp), axis=0)
-        wave = y_interp[t_modulo]
-        wave = self._normalize(wave)
-        self.waveDict[key][self.linear_extrap_str] = wave
+        if self.getPointCount(key) >= 2:
+            wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
+            total_sample_count = int(self.duration * self.sample_rate)
+            x, y = self.getInterpolatedXY(key)
+            t_base = np.linspace(0, x[-1] - x[0], wavelength_sample_count)
+            t_indices = np.linspace(0, total_sample_count, total_sample_count).astype(int)
+            t_modulo = t_indices % wavelength_sample_count
+            y_interp = np.interp(t_base, x, y)
+            y_interp /= np.max(np.abs(y_interp), axis=0)
+            wave = y_interp[t_modulo]
+            wave = self._normalize(wave)
+            self.waveDict[key][self.linear_extrap_str] = wave
 
     def getExtrapolatedWave(self, key, recalculate=False):
         """ 
@@ -235,12 +237,13 @@ class WaveModel:
         return self.waveDict[key][self.linear_extrap_str]
 
     def calculateSineExtrapolatedWave(self, key):
-        frequency = self.getFrequency(key)
-        sine_count = self.getSineCount(key)
-        x, y = self.getInterpolatedXY(key)
-        wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
-        wave = self._normalize(wave)
-        self.waveDict[key][self.sine_extrap_str] = wave
+        if self.getPointCount(key) >= 2:
+            frequency = self.getFrequency(key)
+            sine_count = self.getSineCount(key)
+            x, y = self.getInterpolatedXY(key)
+            wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
+            wave = self._normalize(wave)
+            self.waveDict[key][self.sine_extrap_str] = wave
 
     def _normalize(self, wave:np.ndarray):
         max_amp = np.max(np.abs(wave), axis=0)

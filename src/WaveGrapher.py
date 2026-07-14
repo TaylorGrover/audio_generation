@@ -257,6 +257,7 @@ class WorkspaceWidget(QWidget):
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
         self.catalogWidget.swapGraphsSignal.connect(self.swapGraphs)
+        self.catalogWidget.switchComponentIndex.connect(self.switchComponentGraph)
 
         self.centralGraph.playSignal.connect(self.emitPlaySignal)
         self.centralGraph.durationChangedSignal.connect(self.emitDurationChanged)
@@ -270,6 +271,11 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
+
+    def switchComponentGraph(self, key:int):
+        """
+        """
+        print(key)
 
     def setCurrentlyPlayingStatus(self):
         self.componentGraph.setCurrentlyPlayingStatus()
@@ -911,6 +917,7 @@ class WaveformCatalogWidget(QWidget):
     swapGraphsSignal = Signal(int)
     switchToMainSignal = Signal()
     switchToComponentSignal = Signal()
+    switchComponentIndex = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -948,6 +955,7 @@ class WaveformCatalogWidget(QWidget):
             "widget": button 
         }
         self.vboxLayout.addWidget(button)
+        button.clicked.connect(lambda: self.switchComponentIndex.emit(keyIndex))
         self.emitSwapGraphs(keyIndex)
 
     def emitSwapGraphs(self, keyIndex):

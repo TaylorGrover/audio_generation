@@ -147,7 +147,10 @@ class WaveController:
         self.soundPlayer.stop()
 
     def graphComponentWaveform(self, key):
-        x, y = self.model.getPointsXY(key)
+        points = self.model.getPoints(key)
+        if len(points) == 0:
+            return
+        x, y = zip(*points)
         if len(x) >= 2:
             interp_x, interp_y = self.model.getInterpolatedXY(key)
             sine_x, sine_y = self.model.getSineInterpolatedXY(key)
