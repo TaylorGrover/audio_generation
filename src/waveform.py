@@ -37,6 +37,8 @@ def _build_note_map():
     return note_map
 
 def seeded_waveform(vol, duration, hz, seed, sr, sine_count=13):
+    if len(seed) < 2:
+        return np.zeros([int(duration * sr), 2])
     t = np.linspace(0, duration, int(sr * duration))
     wavelength = 1.0 / hz
     sine_coefficients = np.zeros(sine_count)

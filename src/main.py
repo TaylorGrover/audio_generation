@@ -1,6 +1,6 @@
 import sys
 
-from wave_app_model import WaveModel
+from wave_model import WaveModel
 from wave_controller import WaveController
 from WaveGrapher import WaveView
 

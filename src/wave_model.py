@@ -110,7 +110,6 @@ class WaveModel:
         """
         self.subtractWaveFromCombined(key)
         self.waveDict[key][self.amp_str] = vol
-        print(vol)
 
     def updateLinearInterpolation(self, key, interp_factor:int=2):
         x, y = self.getPointsXY(key)
@@ -132,6 +131,8 @@ class WaveModel:
         
     def updateSineCount(self, key:int, count:int):
         # Only add back to the combined wave if currently a sine wave
+        if self.getPointCount(key) < 2:
+            return 
         isChecked = self.getChecked(key)
         if isChecked:
             self.subtractWaveFromCombined(key)
