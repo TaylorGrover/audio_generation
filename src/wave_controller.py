@@ -52,6 +52,9 @@ class WaveController:
 
         # TODO: Delete a wave from the catalog
 
+        # Swap a component wave with another one and update widget parameter values
+        self.view.adjustParameterWidgetsSignal.connect(self.adjustParameterWidgets)
+
         # TODO: Add an interpolating point to a wave, referenced by index or name
         self.view.pointAdditionSignal.connect(self.addPointToWave)
 
@@ -99,6 +102,17 @@ class WaveController:
         
         # Button shortcuts
         #self.actionMonitor = actionMonitor
+    
+    def adjustParameterWidgets(self, key:int):
+        """
+        * Freq
+        * Volume
+        * Interpolation
+        * 
+        Need to block all signals from the parameter widgets while updating the values
+        """
+        print(key)
+        
     
     def openCatalogAdditionDialog(self, event):
         """

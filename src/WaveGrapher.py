@@ -36,6 +36,7 @@ class WaveView(QMainWindow):
     sineStateChangedSignal = Signal(int, bool)
     volumeUpdateSignal = Signal(int, float)
     stopAudioSignal = Signal()
+    adjustParameterWidgetsSignal = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -69,6 +70,11 @@ class WaveView(QMainWindow):
         self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
         self.workspaceWidget.stopAudioSignal.connect(self.emitStopAudioSignal)
+        self.workspaceWidget.graphSignal.connect(self.emitGraphSignal)
+        self.workspaceWidget.adjustParameterWidgetsSignal.connect(self.emitAdjustParameterWidgets)
+
+    def emitAdjustParameterWidgets(self, key:int):
+        self.adjustParameterWidgetsSignal.emit(key)
 
     def setCurrentlyPlayingStatus(self):
         self.workspaceWidget.setCurrentlyPlayingStatus()
@@ -237,6 +243,7 @@ class WorkspaceWidget(QWidget):
     durationChangedSignal = Signal(float)
     volumeUpdateSignal = Signal(int, float)
     stopAudioSignal = Signal()
+    adjustParameterWidgetsSignal = Signal(int)
 
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
@@ -271,11 +278,14 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
+        
 
     def switchComponentGraph(self, key:int):
         """
         """
-        print(key)
+        self.componentGraph.setKeyIndex(key)
+        self.emitGraphSignal(key)
+        self.emitAdjustParameterWidgets(key)
 
     def setCurrentlyPlayingStatus(self):
         self.componentGraph.setCurrentlyPlayingStatus()
@@ -297,6 +307,13 @@ class WorkspaceWidget(QWidget):
             widget.hide()
             self.gridLayout.addWidget(newWidget, 0, 1)
             newWidget.setVisible(True)
+
+    def emitAdjustParameterWidgets(self, key:int):
+        """
+        Request controller update parameter widget values to 
+        those of the currently selected waveform
+        """
+        self.adjustParameterWidgetsSignal.emit(key)
 
     def emitVolume(self, key:int, vol:float):
         self.volumeUpdateSignal.emit(key, vol)
