@@ -112,7 +112,9 @@ class WaveController:
         Need to block all signals from the parameter widgets while updating the values
         """
         print(key)
-        
+        freq_letter = self.model.getFrequencyLetter(key)
+        freq_cents = self.model.getCents(key)
+        freq_octave = self.model.getOctave(key)
     
     def openCatalogAdditionDialog(self, event):
         """
@@ -163,6 +165,7 @@ class WaveController:
     def graphComponentWaveform(self, key):
         points = self.model.getPoints(key)
         if len(points) == 0:
+            self.clearGraphPoints(key)
             return
         x, y = zip(*points)
         if len(x) >= 2:

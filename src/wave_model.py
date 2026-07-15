@@ -17,6 +17,9 @@ class WaveModel:
         self.amp_str = "amplitude"
         self.sine_count_str = "sine_count"
         self.sine_checked_str = "sine_checked"
+        self.freq_letter_str = "freq_letter"
+        self.freq_cents_str = "freq_cents"
+        self.freq_octave_str = "freq_octave"
         self.duration = 1
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
@@ -36,6 +39,9 @@ class WaveModel:
             , self.freq_str: waveform.F
             , self.sine_count_str: 8
             , self.sine_checked_str: True
+            , self.freq_letter_str: "F"
+            , self.freq_octave_str: 1
+            , self.freq_cents_str: 0
         }
 
     def nameExists(self, name:str) -> bool:
@@ -182,6 +188,9 @@ class WaveModel:
 
     def getSampleRate(self):
         return self.sample_rate
+
+    def getOctave(self, key:int):
+        return self.waveDict.get(key, 1).get(self.)
 
     def getComponentWave(self, key:int, recalculate=False):
         """
