@@ -82,9 +82,6 @@ class WaveView(QMainWindow):
     def emitClearGraphSignal(self, keyIndex):
         self.clearGraphSignal.emit(keyIndex)
 
-    def setCurrentlyPlayingStatus(self):
-        self.workspaceWidget.setCurrentlyPlayingStatus()
-
     def emitDurationChanged(self, duration: float):
         self.durationChangedSignal.emit(duration)
 
@@ -130,6 +127,9 @@ class WaveView(QMainWindow):
 
     def setStopTimer(self, duration:float):
         self.workspaceWidget.setStopTimer(duration)
+
+    def setCurrentlyPlayingStatus(self):
+        self.workspaceWidget.setCurrentlyPlayingStatus()
 
     def addWaveToCatalog(self, keyIndex:int, name:str):
         self.workspaceWidget.addWaveToCatalog(keyIndex, name)
@@ -222,6 +222,9 @@ class WaveView(QMainWindow):
 
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
         self.workspaceWidget.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
+
+    def setSineInterpolatorWidgetParametersBlocked(self, sineCount:int, sineChecked:bool):
+        self.workspaceWidget.setSineInterpolatorWidgetParametersBlocked(sineCount, sineChecked)
 
 class WorkspaceWidget(QWidget):
     """
@@ -368,6 +371,9 @@ class WorkspaceWidget(QWidget):
 
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
         self.componentGraph.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
+
+    def setSineInterpolatorWidgetParametersBlocked(self, sineCount:int, sineChecked:bool):
+        self.componentGraph.setSineInterpolatorWidgetParametersBlocked(sineCount, sineChecked)
 
     def displayDupNameErrMsg(self):
         self.waveformNameInputWidget.displayDupNameErrMsg()
@@ -539,6 +545,9 @@ class ComponentGraphWidget(QWidget):
 
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
         self.graphParametersWidget.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
+
+    def setSineInterpolatorWidgetParametersBlocked(self, sineCount:int, sineChecked:bool):
+        self.graphParametersWidget.setSineInterpolatorWidgetParametersBlocked(sineCount, sineChecked)
 
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
@@ -752,6 +761,12 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.frequencyWidget.setOctave(freqOctave)
         self.frequencyWidget.blockSignals(False)
 
+    def setSineInterpolatorWidgetParametersBlocked(self, sineCount:int, sineChecked:bool):
+        self.sineInterpolatorWidget.blockSignals(True)
+        self.sineInterpolatorWidget.setSineCount(sineCount)
+        self.sineInterpolatorWidget.setSineChecked(sineChecked)
+        self.sineInterpolatorWidget.blockSignals(False)
+
     def emitSineCountChanged(self, count):
         self.sineCountChangedSignal.emit(count)
 
@@ -823,9 +838,15 @@ class SineInterpolatorWidget(QWidget):
     def isChecked(self):
         return self.sinePlotCheckBox.isChecked()
 
-    def sineCount(self):
+    def getSineCount(self):
         return self.sineCountSpin.value()
         
+    def setSineCount(self, sineCount:int):
+        self.sineCountSpin.setValue(sineCount)
+
+    def setSineChecked(self, checked:bool):
+        state = QtCore.Qt.CheckState.Checked if checked else QtCore.Qt.CheckState.Unchecked
+        self.sinePlotCheckBox.setCheckState(state)
 
 class FrequencyWidget(QWidget):
     """
