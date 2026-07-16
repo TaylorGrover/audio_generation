@@ -111,12 +111,10 @@ class WaveController:
         * 
         Need to block all signals from the parameter widgets while updating the values
         """
-        freq_letter = self.model.getFrequencyLetter(key)
         freq_cents = self.model.getCents(key)
+        freq_letter = self.model.getFrequencyLetter(key)
         freq_octave = self.model.getOctave(key)
-        self.view.setFrequencyLetterWidget(freq_letter)
-        self.view.setFrequencyCentsWidget(freq_cents)
-        self.view.setFrequencyOctaveWidget(freq_octave)
+        self.view.setFrequencyWidgetParametersBlocked(freq_cents, freq_letter, freq_octave)
     
     def openCatalogAdditionDialog(self, event):
         """
@@ -186,6 +184,7 @@ class WaveController:
             self.view.closeWaveNameInputWidget()
             self.model.createEmptyWave(self.keyIndexCounter, name)
             self.clearComponentGraph()
+            self.adjustParameterWidgets(self.keyIndexCounter)
             self.view.swapGraphs()
             self.keyIndexCounter += 1
         else:

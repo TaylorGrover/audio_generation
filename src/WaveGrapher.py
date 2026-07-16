@@ -220,6 +220,9 @@ class WaveView(QMainWindow):
         QApplication.closeAllWindows()
         event.accept()
 
+    def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
+        self.workspaceWidget.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
+
 class WorkspaceWidget(QWidget):
     """
     This is the main widget containing the main graph view 
@@ -275,7 +278,31 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
         
+    def emitAdjustParameterWidgets(self, key:int):
+        """
+        Request controller update parameter widget values to 
+        those of the currently selected waveform
+        """
+        self.adjustParameterWidgetsSignal.emit(key)
 
+    def emitCatalogWaveAddInitiate(self, event):
+        self.initiateCatalogAdditionSignal.emit(event)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
+
+    def emitDurationChanged(self, duration:float):
+        self.durationChangedSignal.emit(duration)
+
+    def emitSineCountChanged(self, key, count:int):
+        self.sineCountChangedSignal.emit(key, count)
+
+    def emitSineStateChanged(self, keyIndex, isChecked):
+        self.sineStateChangedSignal.emit(keyIndex, isChecked)
+
+    def emitStopAudio(self):
+        self.stopAudioSignal.emit()
+    
     def switchComponentGraph(self, key:int):
         """
         """
@@ -307,22 +334,9 @@ class WorkspaceWidget(QWidget):
     def clearComponentGraph(self):
         self.componentGraph.clearGraph()
 
-    def emitAdjustParameterWidgets(self, key:int):
-        """
-        Request controller update parameter widget values to 
-        those of the currently selected waveform
-        """
-        self.adjustParameterWidgetsSignal.emit(key)
-
     def emitVolume(self, key:int, vol:float):
         self.volumeUpdateSignal.emit(key, vol)
     
-    def emitStopAudio(self):
-        self.stopAudioSignal.emit()
-    
-    def emitDurationChanged(self, duration:float):
-        self.durationChangedSignal.emit(duration)
-
     def showCentralGraph(self):
         item = self.gridLayout.itemAtPosition(0, 1)
         widget = item.widget()
@@ -340,15 +354,6 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.setStopTimer(duration)
         self.centralGraph.setStopTimer(duration)
 
-    def emitSineStateChanged(self, keyIndex, isChecked):
-        self.sineStateChangedSignal.emit(keyIndex, isChecked)
-
-    def emitSineCountChanged(self, key, count:int):
-        self.sineCountChangedSignal.emit(key, count)
-
-    def emitClearGraphSignal(self, keyIndex):
-        self.clearGraphSignal.emit(keyIndex)
-
     def showComponentGraph(self, keyIndex:int):
         # Check if the centralGraph is currently in place
         item = self.gridLayout.itemAtPosition(0, 1)
@@ -361,6 +366,9 @@ class WorkspaceWidget(QWidget):
             self.componentGraph.setVisible(True)
             self.catalogWidget.toggleMainButton()
 
+    def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
+        self.componentGraph.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
+
     def displayDupNameErrMsg(self):
         self.waveformNameInputWidget.displayDupNameErrMsg()
 
@@ -369,9 +377,6 @@ class WorkspaceWidget(QWidget):
 
     def emitFrequencyParameters(self, keyIndex, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
-
-    def emitCatalogWaveAddInitiate(self, event):
-        self.initiateCatalogAdditionSignal.emit(event)
 
     def emitPlaySignal(self, index):
         self.playSignal.emit(index)
@@ -531,6 +536,9 @@ class ComponentGraphWidget(QWidget):
         self.gridLayout.addWidget(self.window, 0, 1)
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+    def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
+        self.graphParametersWidget.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
 
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
@@ -737,6 +745,13 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.sineInterpolatorWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
+    def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
+        self.frequencyWidget.blockSignals(True)
+        self.frequencyWidget.setCents(freqCents)
+        self.frequencyWidget.setLetter(freqLetter)
+        self.frequencyWidget.setOctave(freqOctave)
+        self.frequencyWidget.blockSignals(False)
+
     def emitSineCountChanged(self, count):
         self.sineCountChangedSignal.emit(count)
 
@@ -861,6 +876,14 @@ class FrequencyWidget(QWidget):
         octave = self.octaveSpin.value()
         return waveform.NOTE_FREQUENCY_MAP[self.frequencySelector.currentText()] * 2 ** (cents / 1200) * 2 ** (octave - 1)
 
+    def setOctave(self, octave:int):
+        self.octaveSpin.setValue(octave)
+    
+    def setLetter(self, letter:str):
+        self.frequencySelector.setCurrentIndex(waveform.NOTE_LETTERS.index(letter))
+
+    def setCents(self, cents:int):
+        self.centsSpin.setValue(cents)
 
 class LabeledWaveImageWidget(QFrame):
     def __init__(self, name: str):
