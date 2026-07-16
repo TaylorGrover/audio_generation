@@ -76,8 +76,47 @@ class WaveView(QMainWindow):
     def emitAdjustParameterWidgets(self, key:int):
         self.adjustParameterWidgetsSignal.emit(key)
 
+    def emitCatalogWaveAdded(self, event):
+        self.initiateCatalogAdditionSignal.emit(event)
+
+    def emitClearGraphSignal(self, keyIndex):
+        self.clearGraphSignal.emit(keyIndex)
+
     def setCurrentlyPlayingStatus(self):
         self.workspaceWidget.setCurrentlyPlayingStatus()
+
+    def emitDurationChanged(self, duration: float):
+        self.durationChangedSignal.emit(duration)
+
+    def emitFrequencyChanged(self, keyIndex, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
+
+    def emitGraphSignal(self, key):
+        self.graphSignal.emit(key)
+
+    def emitPlaySignal(self, index):
+        self.playSignal.emit(index)
+
+    def emitPointAdditionSignal(self, keyIndex, x, y):
+        self.pointAdditionSignal.emit(keyIndex, x, y)
+
+    def emitRedoSignal(self, event):
+        self.redoSignal.emit(event)
+
+    def emitSineCountChanged(self, keyIndex:int, count:int):
+        self.sineCountChangedSignal.emit(keyIndex, count)
+    
+    def emitSineStateChanged(self, keyIndex, isChecked):
+        self.sineStateChangedSignal.emit(keyIndex, isChecked)
+
+    def emitStopAudioSignal(self):
+        self.stopAudioSignal.emit()
+
+    def emitUndoSignal(self, event):
+        self.undoSignal.emit(event)
+
+    def emitVolumeChanged(self, keyIndex:int, vol:float):
+        self.volumeUpdateSignal.emit(keyIndex, vol)
 
     def maximize(self):
         if self.maximized:
@@ -86,29 +125,17 @@ class WaveView(QMainWindow):
             self.showMaximized()
         self.maximized = not self.maximized
 
-    def emitStopAudioSignal(self):
-        self.stopAudioSignal.emit()
-
     def setDurationWidgetValue(self, duration:float):
         self.workspaceWidget.setDurationWidgetValue(duration)
-
-    def emitVolumeChanged(self, keyIndex:int, vol:float):
-        self.volumeUpdateSignal.emit(keyIndex, vol)
-
-    def emitDurationChanged(self, duration: float):
-        self.durationChangedSignal.emit(duration)
 
     def setStopTimer(self, duration:float):
         self.workspaceWidget.setStopTimer(duration)
 
-    def emitSineStateChanged(self, keyIndex, isChecked):
-        self.sineStateChangedSignal.emit(keyIndex, isChecked)
-
-    def emitSineCountChanged(self, keyIndex:int, count:int):
-        self.sineCountChangedSignal.emit(keyIndex, count)
-    
     def addWaveToCatalog(self, keyIndex:int, name:str):
         self.workspaceWidget.addWaveToCatalog(keyIndex, name)
+
+    def clearComponentGraph(self):
+        self.workspaceWidget.clearComponentGraph()
     
     def swapGraphs(self):
         self.workspaceWidget.swapGraphs()
@@ -118,18 +145,6 @@ class WaveView(QMainWindow):
     
     def closeWaveNameInputWidget(self):
         self.workspaceWidget.closeWaveNameInputWidget()
-
-    def emitFrequencyChanged(self, keyIndex, baseFreq, cents, octave):
-        self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
-
-    def emitCatalogWaveAdded(self, event):
-        self.initiateCatalogAdditionSignal.emit(event)
-
-    def emitGraphSignal(self, key):
-        self.graphSignal.emit(key)
-
-    def emitClearGraphSignal(self, keyIndex):
-        self.clearGraphSignal.emit(keyIndex)
 
     def populateFileMenu(self, fileMenu):
         """
@@ -152,25 +167,6 @@ class WaveView(QMainWindow):
         redoAction = QAction("&Redo", self, shortcut="Ctrl+Y", triggered=self.emitRedoSignal)
         editMenu.addAction(undoAction)
         editMenu.addAction(redoAction)
-
-    def populateViewMenu(self, viewMenu):
-        """
-        TODO
-        """
-
-    def emitUndoSignal(self, event):
-        """
-        """
-        self.undoSignal.emit(event)
-
-    def emitRedoSignal(self, event):
-        self.redoSignal.emit(event)
-
-    def emitPlaySignal(self, index):
-        self.playSignal.emit(index)
-
-    def emitPointAdditionSignal(self, keyIndex, x, y):
-        self.pointAdditionSignal.emit(keyIndex, x, y)
 
     def showComponentGraph(self, keyIndex:int):
         self.workspaceWidget.showComponentGraph(keyIndex)
@@ -307,6 +303,9 @@ class WorkspaceWidget(QWidget):
             widget.hide()
             self.gridLayout.addWidget(newWidget, 0, 1)
             newWidget.setVisible(True)
+
+    def clearComponentGraph(self):
+        self.componentGraph.clearGraph()
 
     def emitAdjustParameterWidgets(self, key:int):
         """

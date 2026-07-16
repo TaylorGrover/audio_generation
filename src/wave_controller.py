@@ -111,10 +111,12 @@ class WaveController:
         * 
         Need to block all signals from the parameter widgets while updating the values
         """
-        print(key)
         freq_letter = self.model.getFrequencyLetter(key)
         freq_cents = self.model.getCents(key)
         freq_octave = self.model.getOctave(key)
+        self.view.setFrequencyLetterWidget(freq_letter)
+        self.view.setFrequencyCentsWidget(freq_cents)
+        self.view.setFrequencyOctaveWidget(freq_octave)
     
     def openCatalogAdditionDialog(self, event):
         """
@@ -165,7 +167,7 @@ class WaveController:
     def graphComponentWaveform(self, key):
         points = self.model.getPoints(key)
         if len(points) == 0:
-            self.clearGraphPoints(key)
+            self.clearComponentGraph()
             return
         x, y = zip(*points)
         if len(x) >= 2:
@@ -183,7 +185,7 @@ class WaveController:
             self.view.addWaveToCatalog(self.keyIndexCounter, name)
             self.view.closeWaveNameInputWidget()
             self.model.createEmptyWave(self.keyIndexCounter, name)
-            #self.view.showComponentGraph(self.keyIndexCounter)
+            self.clearComponentGraph()
             self.view.swapGraphs()
             self.keyIndexCounter += 1
         else:
@@ -202,3 +204,11 @@ class WaveController:
     def clearGraphPoints(self, keyIndex):
         self.model.clearGraphPoints(keyIndex)
         self.graphCombinedWave()
+
+    def clearComponentGraph(self):
+        """
+        This is distinct from clearGraphPoints in that it just
+        clears a component graph; it doesn't actually remove the 
+        points from the model.
+        """
+        self.view.clearComponentGraph()

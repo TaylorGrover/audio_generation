@@ -128,9 +128,11 @@ class WaveModel:
         self.waveDict[key][self.sine_checked_str] = isChecked
         self.combined_wave += self.getComponentWave(key, recalculate=True)
 
-    def updateFrequency(self, key, baseFreq, cents, octave):
-        # TODO: This should just subtract from the global wave
+    def updateFrequency(self, key, baseFreq:str, cents:int, octave:int):
         self.subtractWaveFromCombined(key)
+        self.waveDict[key][self.freq_letter_str] = baseFreq
+        self.waveDict[key][self.freq_cents_str] = cents
+        self.waveDict[key][self.freq_octave_str] = octave
         self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
         wave = self.getComponentWave(key, recalculate=True)
         self.combined_wave += wave
@@ -189,8 +191,12 @@ class WaveModel:
     def getSampleRate(self):
         return self.sample_rate
 
-    def getOctave(self, key:int):
-        return self.waveDict.get(key, 1).get(self.)
+    def getOctave(self, key:int) -> int:
+        return self.waveDict.get(key, {}).get(self.freq_octave_str, 1)
+    def getCents(self, key:int) -> int:
+        return self.waveDict.get(key, {}).get(self.freq_cents_str, 0)
+    def getFrequencyLetter(self, key:int) -> str:
+        return self.waveDict.get(key, {}).get(self.freq_letter_str, "F")
 
     def getComponentWave(self, key:int, recalculate=False):
         """
