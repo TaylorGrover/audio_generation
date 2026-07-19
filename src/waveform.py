@@ -194,6 +194,59 @@ def _build_wavetables(sr=SAMPLE_RATE):
 if __name__ == "__main__":
     NOTE_MAP, WAVETABLES = _build_wavetables()
 
+def generate_granular_waveform(
+    vol:float
+    , duration:float
+    , notes: list[str]
+    , drifts_hundredths:int
+    , drift_interval:int
+    , sr:int
+    , granule_density:int=10
+    , granule_length_factor = 1
+):
+    drifts_hundredths = np.abs(drifts_hundredths)
+    n_samples = int(sr * duration)
+    left = np.zeros(n_samples)
+    right = np.zeros(n_samples)
+    left_wavetable, right_wavetable = WAVETABLES
+    wave_index_offsets = np.array([i for i in range(-drifts_hundredths, drifts_hundredths+1, drift_interval)])
+    for note in notes:
+        wave_base_index = NOTE_MAP[note]
+        for i, wave_index_offset in enumerate(wave_index_offsets):
+            wave_current_index = wave_base_index + wave_index_offset
+            left_wave = left_wavetable[wave_current_index]
+            right_wave = right_wavetable[wave_current_index]
+            left_granule = generate_granule(duration, left_wave, granule_density, sr, granule_length_factor)
+            right_granule = generate_granule(duration, right_wave, granule_density, sr, granule_length_factor)
+            left += left_granule
+            right += right_granule
+    wave = np.array([left, right]).T
+    wave = threshold_filter(wave)
+    wave /= np.max(np.abs(wave), axis=0)
+    wave = vol * wave
+    wave = classic_envelope(wave, .01, .02, .02, .8, sr)
+    return wave
+
+def generate_granule(duration:float, waveform:np.ndarray, granule_density:int, sr:int, granule_length_factor:float = 1):
+    total_samples = int(duration * sr)
+    total_estimated_granules = int(granule_density * duration)
+    wave = np.zeros(int(total_samples))
+    orig_wv_sample_count = len(waveform)
+    wv_sample_count = int(orig_wv_sample_count * granule_length_factor)
+    modified_waveform = waveform[np.linspace(0, wv_sample_count, wv_sample_count).astype(int) % orig_wv_sample_count]
+    hanning = np.hanning(wv_sample_count)
+    hanning_wave = hanning * modified_waveform
+    #start_indices = np.linspace(0, total_samples, total_estimated_granules)
+    #start_indices += np.random.normal(wv_sample_count, wv_sample_count // 2, total_estimated_granules)
+    #start_indices = np.clip(start_indices, 0, total_samples - wv_sample_count - 1).astype(int)
+    start_indices = np.random.randint(0, total_samples, total_estimated_granules)
+    start_indices = np.clip(start_indices, 0, total_samples - wv_sample_count - 1).astype(int)
+    for index in start_indices:
+        wave[index:index+wv_sample_count] += hanning_wave
+    #wave = classic_envelope(wave, .01, .01, .022, 1, sr)
+    return wave
+
+
 def integrate(f, a, b, n):
     dx = (b - a) / n
     total = 0
