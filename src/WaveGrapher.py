@@ -8,7 +8,7 @@ import numpy as np
 import os
 from PySide6 import QtCore
 from PySide6.QtCore import QUrl, QSize, QTimer, Signal
-from PySide6.QtGui import QAction, QImage
+from PySide6.QtGui import QAction, QImage, QIcon
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, 
     QFrame, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, 
@@ -320,6 +320,7 @@ class WorkspaceWidget(QWidget):
     def swapGraphs(self):
         # Only swap graphs if the current component index is >0,
         # as this implies there actually exists a component wave
+        # to swap between
         if self.componentGraph.getKeyIndex() > 0:
             item = self.gridLayout.itemAtPosition(0, 1)
             widget = item.widget()
@@ -477,6 +478,10 @@ class CentralGraphWidget(QWidget):
     def setStopTimer(self, duration:float):
         self.graphParametersWidget.setStopTimer(duration)
 
+class EnvelopeGraphWidget(QWidget):
+    def __init__(self):
+        # TODO: Create a graph 
+        super().__init__()
 
 class ComponentGraphWidget(QWidget):
     pointAdditionSignal = Signal(int, float, float)
@@ -484,7 +489,7 @@ class ComponentGraphWidget(QWidget):
     graphSignal = Signal(int)
     clearGraphSignal = Signal(int)
     regraphSignal = Signal(int)
-    # Throw the index in as well 
+    freqEnvSelectedSignal = Signal(int)
     frequencyChangedSignal = Signal(int, str, int, int)
     sineStateChangedSignal = Signal(int, bool)
     sineCountChangedSignal = Signal(int, int)
@@ -537,6 +542,7 @@ class ComponentGraphWidget(QWidget):
         self.graphParametersWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.graphParametersWidget.volumeUpdateSignal.connect(self.emitVolume)
         self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
+        self.graphParametersWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelectedSignal)
 
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
@@ -551,6 +557,9 @@ class ComponentGraphWidget(QWidget):
 
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
+
+    def emitFreqEnvSelectedSignal(self):
+        self.freqEnvSelectedSignal.emit(self.keyIndex)
 
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
@@ -722,6 +731,7 @@ class GenericGraphParametersWidget(QWidget):
 class GraphParametersWidget(GenericGraphParametersWidget):
     regraphSignal = Signal()
     clearGraphSignal = Signal()
+    freqEnvSelectedSignal = Signal()
     frequencyChangedSignal = Signal(str, int, int)
     sineStateChangedSignal = Signal(bool)
     sineCountChangedSignal = Signal(int)
@@ -740,8 +750,23 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.sineInterpolatorWidget.setMaximumSize(self.parameterWidgetMaximumSize)
         self.frequencyWidget = FrequencyWidget()
 
+        self.envelopeWidget = QWidget()
+        self.envelopeWidgetLayout = QHBoxLayout(self.envelopeWidget)
+
+        self.frequencyEnvelopeButton = QPushButton()
+        self.amplitudeEnvelopeButton = QPushButton()
+        self.amplitudeEnvelopeButton.setIcon(QIcon("images/amp_env_icon.png"))
+        self.amplitudeEnvelopeButton.setIconSize(QSize(24, 24))
+        self.frequencyEnvelopeButton.setIcon(QIcon("images/freq_env_icon.png"))
+        self.frequencyEnvelopeButton.setIconSize(QSize(24, 24))
+        self.envelopeWidgetLayout.addWidget(self.amplitudeEnvelopeButton)
+        self.envelopeWidgetLayout.addWidget(self.frequencyEnvelopeButton)
+
+        self.frequencyEnvelopeButton.clicked.connect(self.emitFreqEnvSelectedSignal)
+
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
         self.controlLayout.addRow("Freq:", self.frequencyWidget)
+        self.controlLayout.addRow("Envs:", self.envelopeWidget)
         self.controlLayout.addRow("", self.clearButton)
         self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
         self.controlLayout.setSpacing(10)
@@ -753,6 +778,18 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.sineInterpolatorWidget.changedSignal.connect(self.emitSineStateChanged)
         self.sineInterpolatorWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+
+    def emitFreqEnvSelectedSignal(self):
+        self.freqEnvSelectedSignal.emit()
+
+    def emitFrequencyParameters(self, baseFreq, cents, octave):
+        self.frequencyChangedSignal.emit(baseFreq, cents, octave)
+
+    def emitSineCountChanged(self, count):
+        self.sineCountChangedSignal.emit(count)
+
+    def emitSineStateChanged(self, isChecked):
+        self.sineStateChangedSignal.emit(isChecked)
 
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
         self.frequencyWidget.blockSignals(True)
@@ -766,15 +803,6 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.sineInterpolatorWidget.setSineCount(sineCount)
         self.sineInterpolatorWidget.setSineChecked(sineChecked)
         self.sineInterpolatorWidget.blockSignals(False)
-
-    def emitSineCountChanged(self, count):
-        self.sineCountChangedSignal.emit(count)
-
-    def emitSineStateChanged(self, isChecked):
-        self.sineStateChangedSignal.emit(isChecked)
-
-    def emitFrequencyParameters(self, baseFreq, cents, octave):
-        self.frequencyChangedSignal.emit(baseFreq, cents, octave)
 
     def graphPoints(self, event):
         self.clearGraphSignal.emit()
@@ -854,6 +882,7 @@ class FrequencyWidget(QWidget):
     The new frequency should be recalculated outside of the widget
     """
     frequencyChangedSignal = Signal(str, int, int)
+
     def __init__(self):
         super().__init__()
         self.formLayout = QFormLayout(self)

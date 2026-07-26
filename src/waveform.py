@@ -242,9 +242,36 @@ def generate_granule(duration:float, waveform:np.ndarray, granule_density:int, s
     start_indices = np.random.randint(0, total_samples, total_estimated_granules)
     start_indices = np.clip(start_indices, 0, total_samples - wv_sample_count - 1).astype(int)
     for index in start_indices:
+        # Fade the beginning and end of the inserted region with inverted hanning window
+        if np.abs(wave[index]) > 0 or np.abs(wave[index+wv_sample_count]) > 0:
+            wave[index:index+wv_sample_count] *= (1 - np.hanning(wv_sample_count))
         wave[index:index+wv_sample_count] += hanning_wave
     #wave = classic_envelope(wave, .01, .01, .022, 1, sr)
     return wave
+
+def generate_granule_v2(vol: float, duration: float, waveform:list, granule_density:int, sr:int, min_granule_len=.013, max_granule_len=.045):
+    def add_segment(wave, segment, index):
+        seg_len = len(segment)
+        if np.abs(wave[index]) > 0 or np.abs(wave[index+seg_len]) > 0:
+            inverted_hanning = 1 - np.hanning(seg_len)
+            wave[index:index+seg_len] = wave[index:index+seg_len] * inverted_hanning + segment
+        else:
+            wave[index:index+seg_len] += segment
+    granule_count = int(granule_density * duration)
+    wave = np.zeros((int(sr * duration), 2))
+    max_granule_samples = int(sr * max_granule_len)
+    min_granule_samples = int(sr * min_granule_len)
+    left_start_indices = np.random.randint(0, len(wave) - max_granule_samples, granule_count)
+    right_start_indices = np.random.randint(0, len(wave) - max_granule_samples, granule_count)
+    segment_lengths = np.random.randint(min_granule_samples, max_granule_samples, granule_count)
+    segment_starts = np.random.randint(0, len(waveform) - max_granule_samples, granule_count)
+    for left_index, right_index, seg_start, seg_len in zip(left_start_indices, right_start_indices, segment_starts, segment_lengths):
+        segment = np.hanning(seg_len) * waveform[seg_start:seg_start+seg_len]
+        add_segment(wave.T[0], segment, left_index)
+        add_segment(wave.T[1], segment, right_index)
+    wave /= np.max(np.abs(wave), axis=0)
+    return vol * wave
+
 
 
 def integrate(f, a, b, n):
@@ -313,15 +340,15 @@ def combined_random_waveforms(vol, duration, frequencies, sr, shift=0, n_points=
         wave += seeded_waveform(vol, duration, freq, s, sr, sine_count)
     return vol * wave / np.max(np.abs(wave))
 
-def classic_envelope(audio, attack_ms, decay_ms, release_ms, sustain_fraction, sr):
+def classic_envelope(audio, attack_s, decay_s, release_s, sustain_fraction, sr):
     """
     TODO: Should the audio be required to be at least as long as the 
-    attack_ms + decay_ms + release_ms
+    attack_s + decay_s + release_s
     """
     copied_audio = copy.copy(audio)
-    attack_samples = int(sr * attack_ms)
-    decay_samples = int(sr * decay_ms)
-    release_samples = int(sr * release_ms)
+    attack_samples = int(sr * attack_s)
+    decay_samples = int(sr * decay_s)
+    release_samples = int(sr * release_s)
     attack = np.linspace(0, 1, attack_samples).reshape(-1, 1)
     decay = np.linspace(1, sustain_fraction, decay_samples).reshape(-1, 1)
     release = np.linspace(sustain_fraction, 0, release_samples).reshape(-1, 1)
