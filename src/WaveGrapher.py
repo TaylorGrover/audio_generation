@@ -310,6 +310,7 @@ class WorkspaceWidget(QWidget):
         """
         """
         self.componentGraph.setKeyIndex(key)
+        self.componentGraph.setTitle(self.catalogWidget.getTitle(key))
         self.emitGraphSignal(key)
         self.emitAdjustParameterWidgets(key)
 
@@ -321,12 +322,14 @@ class WorkspaceWidget(QWidget):
         # Only swap graphs if the current component index is >0,
         # as this implies there actually exists a component wave
         # to swap between
-        if self.componentGraph.getKeyIndex() > 0:
+        keyIndex = self.componentGraph.getKeyIndex()
+        if keyIndex > 0:
             item = self.gridLayout.itemAtPosition(0, 1)
             widget = item.widget()
             if widget == self.centralGraph:
                 self.catalogWidget.toggleMainButton()
                 newWidget = self.componentGraph
+                newWidget.setTitle(self.catalogWidget.getTitle(keyIndex))
             elif widget == self.componentGraph:
                 self.catalogWidget.toggleComponentButton()
                 newWidget = self.centralGraph
@@ -557,6 +560,9 @@ class ComponentGraphWidget(QWidget):
 
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
+
+    def setTitle(self, title:str):
+        self.oscillator.setTitle(title)
 
     def emitFreqEnvSelectedSignal(self):
         self.freqEnvSelectedSignal.emit(self.keyIndex)
@@ -1030,6 +1036,9 @@ class WaveformCatalogWidget(QWidget):
     
     def emitInititateAddCatalogWave(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
+
+    def getTitle(self, keyIndex:int):
+        return self.labeledWavesDict.get(keyIndex, {}).get("name", "Oscillator")
 
     def toggleMainButton(self):
         self.toggleGraphButton.setText("Main")
