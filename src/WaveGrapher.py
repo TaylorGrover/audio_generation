@@ -28,6 +28,7 @@ class WaveView(QMainWindow):
     createCatalogWaveSignal = Signal(str)
     durationChangedSignal = Signal(float)
     frequencyChangedSignal = Signal(int, str, int, int)
+    freqEnvSelectedSignal = Signal(int)
     graphSignal = Signal(int) # Emits the key for the specific graph to redraw
     initiateCatalogAdditionSignal = Signal(int)
     playSignal = Signal(int)
@@ -64,6 +65,7 @@ class WaveView(QMainWindow):
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
+        self.workspaceWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelectedSignal)
         self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.workspaceWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.workspaceWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
@@ -87,6 +89,9 @@ class WaveView(QMainWindow):
 
     def emitFrequencyChanged(self, keyIndex, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(keyIndex, baseFreq, cents, octave)
+
+    def emitFreqEnvSelected(self, keyIndex:int):
+        self.freqEnvSelectedSignal.emit(keyIndex)
 
     def emitGraphSignal(self, key):
         self.graphSignal.emit(key)
@@ -210,6 +215,16 @@ class WaveView(QMainWindow):
     def graphCombinedWave(self, t, wave, sample_rate):
         self.workspaceWidget.graphCombinedWave(t, wave, sample_rate)
 
+    def graphFreqEnv(self, env:list[float]):
+        """
+        TODO 
+        """
+    def showFreqEnv(self, env:list[float]):
+        """
+        TODO
+        """
+    
+
     def openCatalogAdditionDialog(self, key) -> bool:
         self.workspaceWidget.openCatalogAdditionDialog(key)
 
@@ -240,6 +255,7 @@ class WorkspaceWidget(QWidget):
     clearGraphSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
     frequencyChangedSignal = Signal(int, str, int, int)
+    freqEnvSelectedSignal = Signal(int)
     sineStateChangedSignal = Signal(int, bool)
     sineCountChangedSignal = Signal(int, int)
     durationChangedSignal = Signal(float)
@@ -275,6 +291,7 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.componentGraph.playSignal.connect(self.emitPlaySignal)
         self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.componentGraph.freqEnvSelectedSignal.connect(self.emitFreqEnvSelectedSignal)
         self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
@@ -296,6 +313,9 @@ class WorkspaceWidget(QWidget):
 
     def emitDurationChanged(self, duration:float):
         self.durationChangedSignal.emit(duration)
+
+    def emitFreqEnvSelectedSignal(self, keyIndex:int):
+        self.freqEnvSelectedSignal.emit(keyIndex)
 
     def emitSineCountChanged(self, key, count:int):
         self.sineCountChangedSignal.emit(key, count)

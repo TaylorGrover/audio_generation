@@ -20,6 +20,7 @@ class WaveModel:
         self.freq_letter_str = "freq_letter"
         self.freq_cents_str = "freq_cents"
         self.freq_octave_str = "freq_octave"
+        self.freq_env_str = "freq_env"
         self.duration = 1
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
@@ -42,6 +43,7 @@ class WaveModel:
             , self.freq_letter_str: "F"
             , self.freq_octave_str: 1
             , self.freq_cents_str: 0
+            , self.freq_env_str: []
         }
 
     def nameExists(self, name:str) -> bool:
@@ -197,6 +199,9 @@ class WaveModel:
         return self.waveDict.get(key, {}).get(self.freq_cents_str, 0)
     def getFrequencyLetter(self, key:int) -> str:
         return self.waveDict.get(key, {}).get(self.freq_letter_str, "F")
+
+    def getFreqEnv(self, key:int):
+        return self.waveDict[key][self.freq_env_str]
 
     def getComponentWave(self, key:int, recalculate=False):
         """

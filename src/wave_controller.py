@@ -64,6 +64,9 @@ class WaveController:
         # TODO: Update sine count for a component wave
         self.view.sineCountChangedSignal.connect(self.updateSineCount)
 
+        # TODO: Toggle freq env 
+        self.view.freqEnvSelectedSignal.connect(self.graphFreqEnv)
+
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
         # TODO: Remove a catalog wave from the component list of the synthesizing workspace
@@ -180,6 +183,14 @@ class WaveController:
             sine_x = x
             sine_y = y
         self.view.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
+
+    def graphFreqEnv(self, key:int):
+        env = self.model.getFreqEnv(key)
+        if len(env) <= 2:
+            # Can't do anything with lt 2 points
+            return
+        self.view.graphFreqEnv(env)
+        self.view.showFreqEnv(env)
 
     def createCatalogWave(self, name:str):
         if not self.model.nameExists(name):
