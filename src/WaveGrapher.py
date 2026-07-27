@@ -290,7 +290,7 @@ class WorkspaceWidget(QWidget):
 
         self.centralGraph.playSignal.connect(self.emitPlaySignal)
         self.centralGraph.durationChangedSignal.connect(self.emitDurationChanged)
-        self.centralGraph.stopAudioSignal.connect(self.emitStopAudio)
+        self.centralGraph.stopAudioSignal.connect(self.emitStopAudioCentral)
 
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.componentGraph.playSignal.connect(self.emitPlaySignal)
@@ -300,7 +300,7 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
-        self.componentGraph.stopAudioSignal.connect(self.emitStopAudio)
+        self.componentGraph.stopAudioSignal.connect(self.emitStopAudioComponent)
         
     def emitAdjustParameterWidgets(self, key:int):
         """
@@ -330,6 +330,14 @@ class WorkspaceWidget(QWidget):
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
     
+    def emitStopAudioCentral(self):
+        self.componentGraph.endStop()
+        self.emitStopAudio()
+
+    def emitStopAudioComponent(self):
+        self.centralGraph.endStop()
+        self.emitStopAudio()
+
     def switchComponentGraph(self, key:int):
         """
         """
@@ -508,6 +516,10 @@ class CentralGraphWidget(QWidget):
     def emitDurationChanged(self, duration):
         self.durationChangedSignal.emit(duration)
 
+    def endStop(self):
+        self.graphParametersWidget.resetPlayButton()
+        self.graphParametersWidget.endStopTimer()
+
     def setStopTimer(self, duration:float):
         self.graphParametersWidget.setStopTimer(duration)
 
@@ -602,6 +614,10 @@ class ComponentGraphWidget(QWidget):
 
     def emitStopAudio(self):
         self.stopAudioSignal.emit()
+
+    def endStop(self):
+        self.graphParametersWidget.resetPlayButton()
+        self.graphParametersWidget.endStopTimer()
 
     def getKeyIndex(self):
         return self.keyIndex
@@ -742,6 +758,9 @@ class GenericGraphParametersWidget(QWidget):
         self.durationSpin.setValue(duration)
 
     def setStopTimer(self, duration:float):
+        """
+        Non-repeating QTimer
+        """
         self.playTimer.setSingleShot(True)
         self.playTimer.timeout.connect(self.resetPlayButton)
         self.playTimer.start(int(round(duration * 1000)))
@@ -762,8 +781,11 @@ class GenericGraphParametersWidget(QWidget):
             self.playSignal.emit(0)
         else:
             self.stopAudioSignal.emit()
-            self.playTimer.stop()
+            self.endStopTimer()
             self.resetPlayButton()
+    
+    def endStopTimer(self):
+        self.playTimer.stop()
 
     def resetPlayButton(self):
         self.playButton.setText("Play")
