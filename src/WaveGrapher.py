@@ -159,9 +159,10 @@ class WaveView(QMainWindow):
         File menu functions:
         * Save
         * Open
+        TODO: Fix
         """
-        saveWaveAction = QAction("&Save Waveform", self, shortcut="Ctrl+S", triggered=self.saveWaveformTrigger)
-        loadWaveAction = QAction("&Load Waveform", self, shortcut="Ctrl+O", triggered=self.loadWaveformTrigger)
+        #saveWaveAction = QAction("&Save Waveform", self, shortcut="Ctrl+S", triggered=self.saveWaveformTrigger)
+        #loadWaveAction = QAction("&Load Waveform", self, shortcut="Ctrl+O", triggered=self.loadWaveformTrigger)
         # fileMenu.addAction(saveWaveAction)
         # fileMenu.addAction(loadWaveAction)
 
@@ -179,38 +180,8 @@ class WaveView(QMainWindow):
     def showComponentGraph(self, keyIndex:int):
         self.workspaceWidget.showComponentGraph(keyIndex)
 
-    def saveWaveformTrigger(self):
-        """
-        Open a QFileDialog to save the waveform
-        TODO: Fix these saving and loading functions.
-        TODO: These need to save the project in its entirety rather than just a single waveform.
-        """
-        filePath, fileType = QFileDialog.getSaveFileName(
-            self
-            , "Save a File:"
-            , os.getcwd()
-            , "JSON Files (*.json);;"
-        )
-        if not filePath.lower().endswith(".json"):
-            filePath = filePath + ".json"
-        x, y = self.graphWidget.getPoints()
-        with open(filePath, "w") as f:
-            json.dump({"x": x, "y": y}, f)
-
-    def loadWaveformTrigger(self):
-        points = self.graphWidget.getPoints()
-        if len(points) > 2:
-            self.saveWaveformTrigger()
-        filePath, fileType = QFileDialog.getOpenFileName(
-            self
-            , "Open a file:"
-            , os.getcwd()
-            , "JSON Files (*.json);;"
-        )
-        with open(filePath, "r") as f:
-            data = json.load(f)
-            self.graphWidget.setPoints(list(zip(data['x'], data['y'])))
-            self.graphWidget.graphPoints()
+    def toggleSelectedButton(self, key:int):
+        self.workspaceWidget.toggleSelectedButton(key)
 
     def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
         self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
@@ -344,6 +315,8 @@ class WorkspaceWidget(QWidget):
     def switchComponentGraph(self, key:int):
         """
         """
+        currentKey = self.componentGraph.getKeyIndex()
+        self.catalogWidget.untoggleSelectedButton(currentKey)
         self.componentGraph.setKeyIndex(key)
         self.componentGraph.setTitle(self.catalogWidget.getTitle(key))
         self.emitGraphSignal(key)
@@ -377,6 +350,10 @@ class WorkspaceWidget(QWidget):
         count = self.catalogWidget.getCount()
         new_key = ((key - 1) % count) + 1
         self.switchComponentGraph(new_key)
+        self.catalogWidget.toggleSelectedButton(new_key)
+
+    def toggleSelectedButton(self, key:int):
+        self.catalogWidget.toggleSelectedButton(key)
 
     def clearComponentGraph(self):
         self.componentGraph.clearGraph()
@@ -1126,6 +1103,10 @@ class WaveformCatalogWidget(QWidget):
     def getTitle(self, keyIndex:int):
         return self.labeledWavesDict.get(keyIndex, {}).get("name", "Oscillator")
 
+    def getButton(self, key:int):
+        button = self.labeledWavesDict.get(key, {}).get("widget")
+        return button
+
     def getCount(self):
         return len(self.labeledWavesDict)
 
@@ -1137,6 +1118,8 @@ class WaveformCatalogWidget(QWidget):
 
     def addWaveWidgetToCatalog(self, keyIndex, name:str):
         button = QPushButton(name)
+        button.setCheckable(True)
+        button.setStyleSheet("QPushButton:checked {background-color: #a0a0a0;}")
         self.labeledWavesDict[keyIndex] = {
             "name": name,
             "widget": button 
@@ -1147,3 +1130,14 @@ class WaveformCatalogWidget(QWidget):
 
     def emitSwapGraphs(self, keyIndex):
         self.swapGraphsSignal.emit(keyIndex)
+
+    def untoggleSelectedButton(self, key:int):
+        button = self.getButton(key)
+        if button:
+            button.setCheckable(True)
+            button.setChecked(False)
+
+    def toggleSelectedButton(self, key:int):
+        button = self.getButton(key)
+        if button:
+            button.setChecked(True)
