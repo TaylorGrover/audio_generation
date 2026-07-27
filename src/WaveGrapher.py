@@ -65,7 +65,7 @@ class WaveView(QMainWindow):
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
-        self.workspaceWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelectedSignal)
+        self.workspaceWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelected)
         self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.workspaceWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.workspaceWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
@@ -223,6 +223,7 @@ class WaveView(QMainWindow):
         """
         TODO
         """
+        self.workspaceWidget.showFreqEnv(env)
     
 
     def openCatalogAdditionDialog(self, key) -> bool:
@@ -291,7 +292,7 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.componentGraph.playSignal.connect(self.emitPlaySignal)
         self.componentGraph.frequencyChangedSignal.connect(self.emitFrequencyParameters)
-        self.componentGraph.freqEnvSelectedSignal.connect(self.emitFreqEnvSelectedSignal)
+        self.componentGraph.freqEnvSelectedSignal.connect(self.emitFreqEnvSelected)
         self.componentGraph.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.componentGraph.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
@@ -314,7 +315,7 @@ class WorkspaceWidget(QWidget):
     def emitDurationChanged(self, duration:float):
         self.durationChangedSignal.emit(duration)
 
-    def emitFreqEnvSelectedSignal(self, keyIndex:int):
+    def emitFreqEnvSelected(self, keyIndex:int):
         self.freqEnvSelectedSignal.emit(keyIndex)
 
     def emitSineCountChanged(self, key, count:int):
@@ -376,6 +377,9 @@ class WorkspaceWidget(QWidget):
 
     def setDurationWidgetValue(self, duration:float):
         self.centralGraph.setDurationWidgetValue(duration)
+
+    def showFreqEnv(self, env:list[float]):
+        self.freqEnvGraph
 
     def setStopTimer(self, duration:float):
         self.componentGraph.setStopTimer(duration)
@@ -565,7 +569,7 @@ class ComponentGraphWidget(QWidget):
         self.graphParametersWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.graphParametersWidget.volumeUpdateSignal.connect(self.emitVolume)
         self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
-        self.graphParametersWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelectedSignal)
+        self.graphParametersWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelected)
 
         self.gridLayout.addWidget(self.graphParametersWidget, 0, 0)
         self.gridLayout.addWidget(self.window, 0, 1)
@@ -584,7 +588,7 @@ class ComponentGraphWidget(QWidget):
     def setTitle(self, title:str):
         self.oscillator.setTitle(title)
 
-    def emitFreqEnvSelectedSignal(self):
+    def emitFreqEnvSelected(self):
         self.freqEnvSelectedSignal.emit(self.keyIndex)
 
     def emitStopAudio(self):
@@ -788,7 +792,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.envelopeWidgetLayout.addWidget(self.amplitudeEnvelopeButton)
         self.envelopeWidgetLayout.addWidget(self.frequencyEnvelopeButton)
 
-        self.frequencyEnvelopeButton.clicked.connect(self.emitFreqEnvSelectedSignal)
+        self.frequencyEnvelopeButton.clicked.connect(self.emitFreqEnvSelected)
 
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
         self.controlLayout.addRow("Freq:", self.frequencyWidget)
@@ -805,7 +809,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.sineInterpolatorWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
 
-    def emitFreqEnvSelectedSignal(self):
+    def emitFreqEnvSelected(self):
         self.freqEnvSelectedSignal.emit()
 
     def emitFrequencyParameters(self, baseFreq, cents, octave):

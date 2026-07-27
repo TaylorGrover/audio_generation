@@ -157,7 +157,7 @@ class WaveController:
             # To play specific component
             if self.model.getPointCount(key) >= 2:
                 # Check that there is a minimum of 2 points
-                wave = self.model.getPlayableComponentWave(key, recalculate=True)
+                wave = self.model.getPlayableComponentWave(key, recalculate=False)
             else:
                 return
         duration = self.model.getDuration()
@@ -186,11 +186,11 @@ class WaveController:
 
     def graphFreqEnv(self, key:int):
         env = self.model.getFreqEnv(key)
+        self.view.showFreqEnv(env)
         if len(env) <= 2:
-            # Can't do anything with lt 2 points
+            # Nothing to graph if no env points
             return
         self.view.graphFreqEnv(env)
-        self.view.showFreqEnv(env)
 
     def createCatalogWave(self, name:str):
         if not self.model.nameExists(name):
