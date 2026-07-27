@@ -283,6 +283,8 @@ class WorkspaceWidget(QWidget):
         self.gridLayout.addWidget(self.catalogWidget, 0, 0)
         self.gridLayout.addWidget(self.centralGraph, 0, 1)
 
+        # Workspace Actions
+
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
         self.catalogWidget.swapGraphsSignal.connect(self.swapGraphs)
@@ -301,6 +303,7 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudioComponent)
+        self.componentGraph.tabGraphSignal.connect(self.tabGraph)
         
     def emitAdjustParameterWidgets(self, key:int):
         """
@@ -369,6 +372,11 @@ class WorkspaceWidget(QWidget):
             widget.hide()
             self.gridLayout.addWidget(newWidget, 0, 1)
             newWidget.setVisible(True)
+
+    def tabGraph(self, key:int):
+        count = self.catalogWidget.getCount()
+        new_key = ((key - 1) % count) + 1
+        self.switchComponentGraph(new_key)
 
     def clearComponentGraph(self):
         self.componentGraph.clearGraph()
@@ -482,6 +490,8 @@ class CentralGraphWidget(QWidget):
 
         self.graphParametersWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
+
+        # CentralGraph Actions
     
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
@@ -540,6 +550,7 @@ class ComponentGraphWidget(QWidget):
     sineCountChangedSignal = Signal(int, int)
     volumeUpdateSignal = Signal(int, float)
     stopAudioSignal = Signal()
+    tabGraphSignal = Signal(int)
 
     # If a component frequency or other parameters are adjusted
     componentChangedSignal = Signal(int) 
@@ -594,6 +605,12 @@ class ComponentGraphWidget(QWidget):
         #self.gridLayout.setSpacing(0)
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
 
+        # ComponentGraph Actions
+        switchComponentForwardAction = QAction("&Switch Component Forward", self, shortcut="Ctrl+Tab", triggered=self.emitCtrlTab)
+        switchComponentBackwardAction = QAction("&Switch Component Backward", self, shortcut="Ctrl+Shift+Tab", triggered=self.emitCtrlShiftTab)
+        self.addAction(switchComponentForwardAction)
+        self.addAction(switchComponentBackwardAction)
+
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
         self.graphParametersWidget.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
 
@@ -608,6 +625,12 @@ class ComponentGraphWidget(QWidget):
 
     def setComponentVolumeWidgetValueParametersBlocked(self, volume:int):
         self.graphParametersWidget.setComponentVolumeWidgetValueParametersBlocked(volume)
+
+    def emitCtrlTab(self):
+        self.tabGraphSignal.emit(self.keyIndex + 1)
+
+    def emitCtrlShiftTab(self):
+        self.tabGraphSignal.emit(self.keyIndex - 1)
 
     def emitFreqEnvSelected(self):
         self.freqEnvSelectedSignal.emit(self.keyIndex)
@@ -1102,6 +1125,9 @@ class WaveformCatalogWidget(QWidget):
 
     def getTitle(self, keyIndex:int):
         return self.labeledWavesDict.get(keyIndex, {}).get("name", "Oscillator")
+
+    def getCount(self):
+        return len(self.labeledWavesDict)
 
     def toggleMainButton(self):
         self.toggleGraphButton.setText("Main")
