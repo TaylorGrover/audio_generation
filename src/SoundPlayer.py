@@ -7,11 +7,12 @@ import waveform
 class SoundPlayer:
     def __init__(self):
         self.sound = None
-    def play(self, wave: np.ndarray, sr:int):
+    def play(self, wave: np.ndarray, sr:int, loop=False):
         path = waveform.generateWaveFilepath()
         waveform.saveWavFile(path, wave, sr)
         self.sound = playsound3.playsound(path, block=False)
-            
+
+
 
     def stop(self):
         if self.sound is not None:

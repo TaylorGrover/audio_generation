@@ -201,7 +201,7 @@ class WaveModel:
         return self.waveDict.get(key, {}).get(self.freq_letter_str, "F")
 
     def getFreqEnv(self, key:int):
-        return self.waveDict[key][self.freq_env_str]
+        return self.waveDict.get(key, {}).get(self.freq_env_str, [])
 
     def getComponentWave(self, key:int, recalculate=False):
         """

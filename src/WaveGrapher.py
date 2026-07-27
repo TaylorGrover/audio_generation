@@ -127,6 +127,9 @@ class WaveView(QMainWindow):
             self.showMaximized()
         self.maximized = not self.maximized
 
+    def setComponentVolumeWidgetValue(self, volume:int):
+        self.workspaceWidget.setComponentVolumeWidgetValue(volume)
+
     def setDurationWidgetValue(self, duration:float):
         self.workspaceWidget.setDurationWidgetValue(duration)
 
@@ -378,6 +381,9 @@ class WorkspaceWidget(QWidget):
     def setDurationWidgetValue(self, duration:float):
         self.centralGraph.setDurationWidgetValue(duration)
 
+    def setComponentVolumeWidgetValue(self, volume:int):
+        self.componentGraph.setComponentVolumeWidgetValueParametersBlocked(volume)
+
     def showFreqEnv(self, env:list[float]):
         self.freqEnvGraph
 
@@ -588,6 +594,9 @@ class ComponentGraphWidget(QWidget):
     def setTitle(self, title:str):
         self.oscillator.setTitle(title)
 
+    def setComponentVolumeWidgetValueParametersBlocked(self, volume:int):
+        self.graphParametersWidget.setComponentVolumeWidgetValueParametersBlocked(volume)
+
     def emitFreqEnvSelected(self):
         self.freqEnvSelectedSignal.emit(self.keyIndex)
 
@@ -719,6 +728,11 @@ class GenericGraphParametersWidget(QWidget):
         self.controlLayout.addRow("Volume:", self.volumeSlider)
         self.controlLayout.addRow("Duration:", self.durationSpin)
         self.controlLayout.addRow("", self.playButton)
+
+    def setComponentVolumeWidgetValueParametersBlocked(self, volume:int):
+        self.volumeSlider.blockSignals(True)
+        self.volumeSlider.setVolume(volume)
+        self.volumeSlider.blockSignals(False)
 
     def setCurrentlyPlayingStatus(self):
         self.isPlaying = True
@@ -862,6 +876,9 @@ class VolumeControlsWidget(QWidget):
 
     def emitVolume(self):
         self.volumeUpdateSignal.emit(self.getVolume())
+
+    def setVolume(self, volume:int):
+        self.volumeSlider.setValue(volume)
 
 class SineInterpolatorWidget(QWidget):
     changedSignal = Signal(bool)

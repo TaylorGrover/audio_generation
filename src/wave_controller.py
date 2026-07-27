@@ -119,8 +119,10 @@ class WaveController:
         freq_octave = self.model.getOctave(key)
         sine_count = self.model.getSineCount(key)
         sine_checked = self.model.getChecked(key)
+        amplitude = self.model.getAmplitude(key)
         self.view.setFrequencyWidgetParametersBlocked(freq_cents, freq_letter, freq_octave)
         self.view.setSineInterpolatorWidgetParametersBlocked(sine_count, sine_checked)
+        self.view.setComponentVolumeWidgetValue(int(10 * amplitude))
     
     def openCatalogAdditionDialog(self, event):
         """
