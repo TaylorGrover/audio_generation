@@ -255,6 +255,8 @@ class WorkspaceWidget(QWidget):
         self.gridLayout.addWidget(self.centralGraph, 0, 1)
 
         # Workspace Actions
+        addWaveAction = QAction("&Add Wave Action", self, shortcut="w", triggered=self.emitCatalogWaveAddInitiate)
+        self.addAction(addWaveAction)
 
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
@@ -316,6 +318,10 @@ class WorkspaceWidget(QWidget):
         """
         """
         currentKey = self.componentGraph.getKeyIndex()
+        if currentKey == key:
+            # Don't do anything if the button was clicked except retoggle the button
+            self.catalogWidget.toggleSelectedButton(currentKey)
+            return
         self.catalogWidget.untoggleSelectedButton(currentKey)
         self.componentGraph.setKeyIndex(key)
         self.componentGraph.setTitle(self.catalogWidget.getTitle(key))
@@ -438,6 +444,7 @@ class WorkspaceWidget(QWidget):
 
     def addWaveToCatalog(self, keyIndex:int, name:str):
         self.catalogWidget.addWaveWidgetToCatalog(keyIndex, name)
+        self.catalogWidget.untoggleSelectedButton(self.componentGraph.getKeyIndex())
         self.componentGraph.setKeyIndex(keyIndex)
         self.waveformNameInputWidget.closeWindowAndClearInput()
 
@@ -585,8 +592,10 @@ class ComponentGraphWidget(QWidget):
         # ComponentGraph Actions
         switchComponentForwardAction = QAction("&Switch Component Forward", self, shortcut="Ctrl+Tab", triggered=self.emitCtrlTab)
         switchComponentBackwardAction = QAction("&Switch Component Backward", self, shortcut="Ctrl+Shift+Tab", triggered=self.emitCtrlShiftTab)
+        playSoundAction = QAction("&Play Sound", self, shortcut="Space", triggered=self.graphParametersWidget.emitPlayButtonSignal)
         self.addAction(switchComponentForwardAction)
         self.addAction(switchComponentBackwardAction)
+        self.addAction(playSoundAction)
 
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):
         self.graphParametersWidget.setFrequencyWidgetParametersBlocked(freqCents, freqLetter, freqOctave)
@@ -726,7 +735,10 @@ class GenericGraphParametersWidget(QWidget):
 
         self.volumeSlider = VolumeControlsWidget()
 
-        self.playButton = QPushButton("Play")
+        self.playButton = QPushButton()
+        self.playIcon = QIcon("images/play_icon.png")
+        self.stopIcon = QIcon("images/stop_icon.png")
+        self.resetPlayButton()
         self.playButton.setMinimumSize(self.parameterWidgetMinimumSize)
         self.playButton.setMaximumSize(QSize(100, 100))
         #self.setMinimumSize(self.parameterWidgetMinimumSize)
@@ -752,7 +764,7 @@ class GenericGraphParametersWidget(QWidget):
 
     def setCurrentlyPlayingStatus(self):
         self.isPlaying = True
-        self.playButton.setText("Stop")
+        self.playButton.setIcon(self.stopIcon)
     
     def setDurationWidgetValue(self, duration: float):
         self.durationSpin.setValue(duration)
@@ -788,7 +800,8 @@ class GenericGraphParametersWidget(QWidget):
         self.playTimer.stop()
 
     def resetPlayButton(self):
-        self.playButton.setText("Play")
+        self.playButton.setIcon(self.playIcon)
+        self.playButton.setIconSize(QSize(32, 24))
         self.isPlaying = False
 
     def emitStopAudio(self):
