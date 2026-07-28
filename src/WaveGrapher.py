@@ -256,7 +256,7 @@ class WorkspaceWidget(QWidget):
 
         # Workspace Actions
         addWaveAction = QAction("&Add Wave", self, shortcut="w", triggered=self.emitCatalogWaveAddInitiate)
-        toggleGraphsAction = QAction("&Toggle Graph", self, shortcut="m", triggered=self.swapGraphs)
+        toggleGraphsAction = QAction("&Toggle Graph", self, shortcut="Tab", triggered=self.swapGraphs)
         self.addAction(addWaveAction)
         self.addAction(toggleGraphsAction)
 
