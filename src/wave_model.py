@@ -21,6 +21,7 @@ class WaveModel:
         self.freq_cents_str = "freq_cents"
         self.freq_octave_str = "freq_octave"
         self.freq_env_str = "freq_env"
+        self.amp_env_str = "amp_env"
         self.duration = 1
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
@@ -44,6 +45,7 @@ class WaveModel:
             , self.freq_octave_str: 1
             , self.freq_cents_str: 0
             , self.freq_env_str: []
+            , self.amp_env_str: []
         }
 
     def nameExists(self, name:str) -> bool:
@@ -235,7 +237,7 @@ class WaveModel:
         return fade_in
 
 
-    def calculateExtrapolatedWave(self, key):
+    def calculateLinearExtrapolatedWave(self, key):
         if self.getPointCount(key) >= 2:
             wavelength_sample_count = int(self.sample_rate / self.getFrequency(key))
             total_sample_count = int(self.duration * self.sample_rate)
@@ -254,7 +256,7 @@ class WaveModel:
         The linearly interpolated wave that is actually heard
         """
         if recalculate:
-            self.calculateExtrapolatedWave(key)
+            self.calculateLinearExtrapolatedWave(key)
         return self.waveDict[key][self.linear_extrap_str]
 
     def calculateSineExtrapolatedWave(self, key):
@@ -287,7 +289,7 @@ class WaveModel:
         self.combined_wave = np.zeros_like(self.t)
         for keyIndex in self.waveDict:
             if recalculate:
-                self.calculateExtrapolatedWave(keyIndex)
+                self.calculateLinearExtrapolatedWave(keyIndex)
                 self.calculateSineExtrapolatedWave(keyIndex)
             if self.getChecked(keyIndex):
                 self.combined_wave += self.getSineExtrapolatedWave(keyIndex, False)

@@ -8,7 +8,7 @@ import numpy as np
 import os
 from PySide6 import QtCore
 from PySide6.QtCore import QUrl, QSize, QTimer, Signal
-from PySide6.QtGui import QAction, QImage, QIcon
+from PySide6.QtGui import QAction, QImage, QIcon, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDial, QDoubleSpinBox, 
     QFrame, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, 
@@ -255,8 +255,10 @@ class WorkspaceWidget(QWidget):
         self.gridLayout.addWidget(self.centralGraph, 0, 1)
 
         # Workspace Actions
-        addWaveAction = QAction("&Add Wave Action", self, shortcut="w", triggered=self.emitCatalogWaveAddInitiate)
+        addWaveAction = QAction("&Add Wave", self, shortcut="w", triggered=self.emitCatalogWaveAddInitiate)
+        toggleGraphsAction = QAction("&Toggle Graph", self, shortcut="m", triggered=self.swapGraphs)
         self.addAction(addWaveAction)
+        self.addAction(toggleGraphsAction)
 
         # Signal management
         self.catalogWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAddInitiate)
@@ -476,6 +478,8 @@ class CentralGraphWidget(QWidget):
         self.graphParametersWidget.stopAudioSignal.connect(self.emitStopAudio)
 
         # CentralGraph Actions
+        playAction = QAction("&Play Sound", self, shortcut="Space", triggered=self.graphParametersWidget.emitPlayButtonSignal)
+        self.addAction(playAction)
     
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
