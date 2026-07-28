@@ -257,6 +257,10 @@ class WorkspaceWidget(QWidget):
         # Workspace Actions
         addWaveAction = QAction("&Add Wave", self, shortcut="w", triggered=self.emitCatalogWaveAddInitiate)
         toggleGraphsAction = QAction("&Toggle Graph", self, shortcut="Tab", triggered=self.swapGraphs)
+        switchComponentForwardAction = QAction("&Switch Component Forward", self, shortcut="Ctrl+Tab", triggered=self.ctrlTab)
+        switchComponentBackwardAction = QAction("&Switch Component Backward", self, shortcut="Ctrl+Shift+Tab", triggered=self.ctrlShiftTab)
+        self.addAction(switchComponentForwardAction)
+        self.addAction(switchComponentBackwardAction)
         self.addAction(addWaveAction)
         self.addAction(toggleGraphsAction)
 
@@ -278,7 +282,7 @@ class WorkspaceWidget(QWidget):
         self.componentGraph.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.componentGraph.volumeUpdateSignal.connect(self.emitVolume)
         self.componentGraph.stopAudioSignal.connect(self.emitStopAudioComponent)
-        self.componentGraph.tabGraphSignal.connect(self.tabGraph)
+        #self.componentGraph.tabGraphSignal.connect(self.tabGraph)
         
     def emitAdjustParameterWidgets(self, key:int):
         """
@@ -354,8 +358,18 @@ class WorkspaceWidget(QWidget):
             self.gridLayout.addWidget(newWidget, 0, 1)
             newWidget.setVisible(True)
 
+    def ctrlTab(self):
+        key = self.componentGraph.getKeyIndex()
+        self.tabGraph(key + 1)
+    
+    def ctrlShiftTab(self):
+        key = self.componentGraph.getKeyIndex()
+        self.tabGraph(key - 1)
+
     def tabGraph(self, key:int):
         count = self.catalogWidget.getCount()
+        if count == 0:
+            return
         new_key = ((key - 1) % count) + 1
         self.switchComponentGraph(new_key)
         self.catalogWidget.toggleSelectedButton(new_key)
@@ -594,11 +608,7 @@ class ComponentGraphWidget(QWidget):
         #self.gridLayout.setContentsMargins(0, 0, 0, 0)
 
         # ComponentGraph Actions
-        switchComponentForwardAction = QAction("&Switch Component Forward", self, shortcut="Ctrl+Tab", triggered=self.emitCtrlTab)
-        switchComponentBackwardAction = QAction("&Switch Component Backward", self, shortcut="Ctrl+Shift+Tab", triggered=self.emitCtrlShiftTab)
         playSoundAction = QAction("&Play Sound", self, shortcut="Space", triggered=self.graphParametersWidget.emitPlayButtonSignal)
-        self.addAction(switchComponentForwardAction)
-        self.addAction(switchComponentBackwardAction)
         self.addAction(playSoundAction)
 
     def setFrequencyWidgetParametersBlocked(self, freqCents:int, freqLetter:str, freqOctave:int):

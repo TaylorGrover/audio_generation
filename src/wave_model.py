@@ -209,6 +209,7 @@ class WaveModel:
         """
         Generate wave based on checked status
         """
+
         if self.waveDict[key][self.sine_checked_str]:
             wave = self.getSineExtrapolatedWave(key, recalculate=recalculate)
         else:
@@ -250,6 +251,8 @@ class WaveModel:
             wave = y_interp[t_modulo]
             wave = self._normalize(wave)
             self.waveDict[key][self.linear_extrap_str] = wave
+        else:
+            self.waveDict[key][self.linear_extrap_str] = np.zeros_like(self.t)
 
     def getExtrapolatedWave(self, key, recalculate=False):
         """ 
@@ -267,6 +270,8 @@ class WaveModel:
             wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
             wave = self._normalize(wave)
             self.waveDict[key][self.sine_extrap_str] = wave
+        else:
+            self.waveDict[key][self.sine_extrap_str] = np.zeros_like(self.t)
 
     def _normalize(self, wave:np.ndarray):
         max_amp = np.max(np.abs(wave), axis=0)
