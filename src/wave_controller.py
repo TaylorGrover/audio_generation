@@ -138,7 +138,7 @@ class WaveController:
         random points centered around a particular frequency with normally 
         distributed cents
         """
-        self.view.openRandomPointsDialog
+        self.view.openRandomPointsDialog()
     
     def openCatalogAdditionDialog(self, event):
         """
