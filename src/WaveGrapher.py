@@ -2,6 +2,7 @@
 Proof-of-concept for displaying simple hand-traced points; sine and linear interpolation;
 and audio playback of each form.
 """
+import abc
 import bisect
 import json
 import numpy as np
@@ -31,6 +32,7 @@ class WaveView(QMainWindow):
     freqEnvSelectedSignal = Signal(int)
     graphSignal = Signal(int) # Emits the key for the specific graph to redraw
     initiateCatalogAdditionSignal = Signal(int)
+    initiateRandWaveAdditionSignal = Signal()
     playSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
     sineCountChangedSignal = Signal(int, int)
@@ -61,6 +63,7 @@ class WaveView(QMainWindow):
 
         # Signals and slots
         self.workspaceWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAdded)
+        self.workspaceWidget.initiateRandWaveAdditionSignal.connect(self.emitRandWaveAdd)
         self.workspaceWidget.createCatalogWaveSignal.connect(lambda name: self.createCatalogWaveSignal.emit(name))
         self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
         self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
@@ -102,6 +105,9 @@ class WaveView(QMainWindow):
     def emitPointAdditionSignal(self, keyIndex, x, y):
         self.pointAdditionSignal.emit(keyIndex, x, y)
 
+    def emitRandWaveAdd(self):
+        self.initiateRandWaveAdditionSignal.emit()
+
     def emitRedoSignal(self, event):
         self.redoSignal.emit(event)
 
@@ -126,6 +132,9 @@ class WaveView(QMainWindow):
         else:
             self.showMaximized()
         self.maximized = not self.maximized
+
+    def openRandomPointsDialog(self):
+        self.workspaceWidget.openRandomPointsDialog()
 
     def setComponentVolumeWidgetValue(self, volume:int):
         self.workspaceWidget.setComponentVolumeWidgetValue(volume)
@@ -200,8 +209,11 @@ class WaveView(QMainWindow):
         self.workspaceWidget.showFreqEnv(env)
     
 
-    def openCatalogAdditionDialog(self, key) -> bool:
+    def openCatalogAdditionDialog(self, key):
         self.workspaceWidget.openCatalogAdditionDialog(key)
+
+    def openRandomPointsDialog(self):
+        self.workspaceWidget.openRandomPointsDialog()
 
     def closeEvent(self, event):
         """
@@ -222,6 +234,7 @@ class WorkspaceWidget(QWidget):
     (for editors and the summed signal)
     """
     initiateCatalogAdditionSignal = Signal(int)
+    initiateRandWaveAdditionSignal = Signal()
     createCatalogWaveSignal = Signal(str)
     swapGraphViewSignal = Signal(int)
     
@@ -245,6 +258,7 @@ class WorkspaceWidget(QWidget):
         self.waveformNameInputWidget = WaveNameInputWidget(maxWidth, maxHeight)
         self.waveformNameInputWidget.createCatalogWaveSignal.connect(self.createNewWaveformWindow)
         self.waveformNameInputWidget.move(self.maxWidth//2, self.maxHeight//2)
+        self.randWaveformsInputWidget = RandomWaveformsInputWidget(maxWidth, maxHeight)
         self.waveformWidgetDict = {}
         self.gridLayout = QGridLayout(self)
         self.componentGraph = ComponentGraphWidget()
@@ -256,6 +270,7 @@ class WorkspaceWidget(QWidget):
 
         # Workspace Actions
         addWaveAction = QAction("&Add Wave", self, shortcut="w", triggered=self.emitCatalogWaveAddInitiate)
+        addRandWaveAction = QAction("&Add Random Waves", self, shortcut="w", triggered=self.emitRandomWaveAddInitiate)
         toggleGraphsAction = QAction("&Toggle Graph", self, shortcut="Tab", triggered=self.swapGraphs)
         switchComponentForwardAction = QAction("&Switch Component Forward", self, shortcut="Ctrl+Tab", triggered=self.ctrlTab)
         switchComponentBackwardAction = QAction("&Switch Component Backward", self, shortcut="Ctrl+Shift+Tab", triggered=self.ctrlShiftTab)
@@ -302,6 +317,9 @@ class WorkspaceWidget(QWidget):
 
     def emitFreqEnvSelected(self, keyIndex:int):
         self.freqEnvSelectedSignal.emit(keyIndex)
+
+    def emitRandomWaveAddInitiate(self):
+        self.initiateRandWaveAdditionSignal.emit()
 
     def emitSineCountChanged(self, key, count:int):
         self.sineCountChangedSignal.emit(key, count)
@@ -457,6 +475,10 @@ class WorkspaceWidget(QWidget):
         """
         self.waveformNameInputWidget.setVisible(True)
         self.waveformNameInputWidget.focusInput()
+
+    def openRandomPointsDialog(self):
+        self.randWaveformsInputWidget.setVisible(True)
+        self.randWaveformsInputWidget.focusInput()
 
     def addWaveToCatalog(self, keyIndex:int, name:str):
         self.catalogWidget.addWaveWidgetToCatalog(keyIndex, name)
@@ -1041,21 +1063,17 @@ class LabeledWaveImageWidget(QFrame):
         #self.setStyleSheet("border: 1px solid blue")
         #self.vboxLayout.addWidget(self.image)
 
-class WaveNameInputWidget(QWidget):
-    createCatalogWaveSignal = Signal(str)
-    cancelSignal = Signal(int)
+class DialogWidget(QWidget):
     def __init__(self, maxWidth, maxHeight):
         super().__init__()
+        self.maxWidth = maxWidth
+        self.maxHeight = maxHeight
+        self.move(self.maxWidth // 2, self.maxHeight // 2)
         closeWindowAction = QAction("&Close Window", self, shortcut="Esc", triggered=self.closeWindowAndClearInput)
         enterAction = QAction("&Accept Input", self, shortcut="Return", triggered=self.enterPressed)
         self.addAction(closeWindowAction)
         self.addAction(enterAction)
-        self.maxWidth = maxWidth
-        self.maxHeight = maxHeight
-        self.move(self.maxWidth // 2, self.maxHeight // 2)
         self.formLayout = QFormLayout(self)
-        self.userInput = QLineEdit()
-        self.formLayout.addRow("Enter waveform name:", self.userInput)
         self.ok = QPushButton("Ok")
         self.cancel = QPushButton("Cancel")
         self.okCancelComplex = QWidget()
@@ -1069,6 +1087,33 @@ class WaveNameInputWidget(QWidget):
         self.ok.clicked.connect(self.okClicked)
         self.cancel.clicked.connect(lambda e: self.cancelSignal.emit(e))
 
+    def closeWindowAndClearInput(self):
+        self.clearParamFields()
+        self.setVisible(False)
+
+    @abc.abstractmethod
+    def clearParamFields(self):
+        pass
+
+    def enterPressed(self, event):
+        if self.cancel.hasFocus():
+            self.closeWindowAndClearInput()
+        else:
+            self.okClicked(event)
+
+    @abc.abstractmethod
+    def okClicked(self, event):
+        pass
+    
+
+class WaveNameInputWidget(DialogWidget):
+    createCatalogWaveSignal = Signal(str)
+    cancelSignal = Signal(int)
+    def __init__(self, maxWidth, maxHeight):
+        super().__init__(maxWidth, maxHeight)
+        self.userInput = QLineEdit()
+        self.formLayout.addRow("Enter waveform name:", self.userInput)
+
     def enterPressed(self, event):
         if self.cancel.hasFocus():
             self.closeWindowAndClearInput()
@@ -1080,20 +1125,70 @@ class WaveNameInputWidget(QWidget):
         else:
             name = self.userInput.text()
             self.createCatalogWaveSignal.emit(name)
-    def deleteUserInput(self):
-        self.userInput.setText("")
     def getName(self):
         return self.userInput.text()
-    def closeWindowAndClearInput(self):
-        self.clearTextFields()
-        self.setVisible(False)
-    def clearTextFields(self):
+    def clearParamFields(self):
         self.userInput.setText("")
         self.errorLabel.setText("")
     def focusInput(self):
         self.userInput.setFocus()
     def displayDupNameErrMsg(self):
         self.errorLabel.setText("Name '{}' already exists in catalog".format(self.getName()))
+
+class RandomWaveformsInputWidget(DialogWidget):
+    """
+    Parameters required to generate a set of random waveforms
+    Waveform count: int [1-12]
+    Central frequency: str
+    Max Cents: int
+    Min Points: int
+    Max Points: int
+    Min Sine Count: int
+    Max Sine Count: int
+    """
+    waveformParametersSignal = Signal(int, str, int, int, int, int, int)
+    def __init__(self, maxWidth, maxHeight):
+        super().__init__(maxWidth, maxHeight)
+
+        self.waveformCountSpin = QSpinBox()
+        self.waveformCountSpin.setRange(1, 12)
+        self.waveformCountSpin.setValue(6)
+
+        self.frequencySelector = QComboBox()
+        self.frequencySelector.addItems(waveform.NOTE_LETTERS)
+
+        self.maxCentsSpin = QSpinBox()
+        self.maxCentsSpin.setRange(1, 100)
+        self.maxCentsSpin.setValue(30)
+
+        self.minPointsSpin = QSpinBox()
+        self.minPointsSpin.setRange(2, 25)
+        self.minPointsSpin.setValue(10)
+
+        self.maxPointsSpin = QSpinBox()
+        self.maxPointsSpin.setRange(2, 25)
+        self.maxPointsSpin.setValue(15)
+
+        self.minSineSpin = QSpinBox()
+        self.minSineSpin.setRange(1, 50)
+        self.minSineSpin.setValue(8)
+
+        self.maxSineSpin = QSpinBox()
+        self.maxSineSpin.setRange(1, 50)
+        self.minSineSpin.setValue(15)
+        
+        # For each of these max/min pairs, a change in the min should produce a change in the max
+        # without the latter signaling the change, and vice versa. That is, in the case the min
+        # exceeds the current maximum value
+        self.formLayout.addRow("Wave Count:", self.waveformCountSpin)
+        self.formLayout.addRow("Freq:", self.frequencySelector)
+        self.formLayout.addRow("Max Cents:", self.maxCentsSpin)
+        self.formLayout.addRow("Min Points:", self.minPointsSpin)
+        self.formLayout.addRow("Max Points:", self.maxPointsSpin)
+        self.formLayout.addRow("Min Sine:" , self.minSineSpin)
+        self.formLayout.addRow("Max Sine:", self.maxSineSpin)
+        
+
 
 class WaveformCatalogWidget(QWidget):
     """
@@ -1113,12 +1208,17 @@ class WaveformCatalogWidget(QWidget):
         self.catalogVBox = QVBoxLayout(self.catalogSection)
         self.addWaveButton = QPushButton("+")
         self.addWaveButton.setMaximumSize(QSize(100, 100))
+        self.addRandomWaveButton = QPushButton("+Rand")
+        #self.randomWaveIcon = QIcon("images/rand_points_icon.png")
+        #self.addRandomWaveButton.setIcon(self.randomWaveIcon)
+        #self.addRandomWaveButton.setIconSize(QSize(48, 24))
         self.toggleGraphButton = QPushButton("Component")
 
         self.vboxLayout.insertWidget(-1, self.toggleGraphButton)
         self.vboxLayout.addStretch()
         self.vboxLayout.insertWidget(-1, self.catalogSection)
         self.vboxLayout.insertWidget(-1, self.addWaveButton)
+        self.vboxLayout.insertWidget(-1, self.addRandomWaveButton)
 
         # Signals 
         self.addWaveButton.clicked.connect(self.emitInititateAddCatalogWave)

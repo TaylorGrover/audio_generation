@@ -67,6 +67,9 @@ class WaveController:
         # TODO: Toggle freq env 
         self.view.freqEnvSelectedSignal.connect(self.graphFreqEnv)
 
+        # Generate several waves with random points
+        self.view.initiateRandWaveAdditionSignal.connect(self.openRandomPointsDialog)
+
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
         # TODO: Remove a catalog wave from the component list of the synthesizing workspace
@@ -123,6 +126,19 @@ class WaveController:
         self.view.setFrequencyWidgetParametersBlocked(freq_cents, freq_letter, freq_octave)
         self.view.setSineInterpolatorWidgetParametersBlocked(sine_count, sine_checked)
         self.view.setComponentVolumeWidgetValue(int(10 * amplitude))
+
+    def generateRandomWaveforms(self):
+        """
+        TODO
+        """
+
+    def openRandomPointsDialog(self):
+        """
+        Dialog for specifying statistical parameters to automatically generate 
+        random points centered around a particular frequency with normally 
+        distributed cents
+        """
+        self.view.openRandomPointsDialog
     
     def openCatalogAdditionDialog(self, event):
         """
