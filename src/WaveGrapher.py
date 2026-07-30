@@ -25,6 +25,7 @@ class WaveView(QMainWindow):
     undoSignal = Signal(int)
     redoSignal = Signal(int)
 
+    adjustParameterWidgetsSignal = Signal(int)
     clearGraphSignal = Signal(int)
     createCatalogWaveSignal = Signal(str)
     durationChangedSignal = Signal(float)
@@ -35,11 +36,11 @@ class WaveView(QMainWindow):
     initiateRandWaveAdditionSignal = Signal()
     playSignal = Signal(int)
     pointAdditionSignal = Signal(int, float, float)
+    randomWaveParamsSignal = Signal(int, str, int, int, int, int, int)
     sineCountChangedSignal = Signal(int, int)
     sineStateChangedSignal = Signal(int, bool)
-    volumeUpdateSignal = Signal(int, float)
     stopAudioSignal = Signal()
-    adjustParameterWidgetsSignal = Signal(int)
+    volumeUpdateSignal = Signal(int, float)
 
     def __init__(self):
         super().__init__()
@@ -62,21 +63,22 @@ class WaveView(QMainWindow):
         self.addAction(fullScreenAction)
 
         # Signals and slots
-        self.workspaceWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAdded)
-        self.workspaceWidget.initiateRandWaveAdditionSignal.connect(self.emitRandWaveAdd)
+        self.workspaceWidget.adjustParameterWidgetsSignal.connect(self.emitAdjustParameterWidgets)
+        self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
         self.workspaceWidget.createCatalogWaveSignal.connect(lambda name: self.createCatalogWaveSignal.emit(name))
-        self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
-        self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
+        self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
         self.workspaceWidget.frequencyChangedSignal.connect(self.emitFrequencyChanged)
         self.workspaceWidget.freqEnvSelectedSignal.connect(self.emitFreqEnvSelected)
-        self.workspaceWidget.clearGraphSignal.connect(self.emitClearGraphSignal)
+        self.workspaceWidget.graphSignal.connect(self.emitGraphSignal)
+        self.workspaceWidget.initiateCatalogAdditionSignal.connect(self.emitCatalogWaveAdded)
+        self.workspaceWidget.initiateRandWaveAdditionSignal.connect(self.emitRandWaveAdd)
+        self.workspaceWidget.randomWaveParamsSignal.connect(self.emitRandomWaveParams)
+        self.workspaceWidget.playSignal.connect(self.emitPlaySignal)
+        self.workspaceWidget.pointAdditionSignal.connect(self.emitPointAdditionSignal)
         self.workspaceWidget.sineStateChangedSignal.connect(self.emitSineStateChanged)
         self.workspaceWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
-        self.workspaceWidget.durationChangedSignal.connect(self.emitDurationChanged)
-        self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
         self.workspaceWidget.stopAudioSignal.connect(self.emitStopAudioSignal)
-        self.workspaceWidget.graphSignal.connect(self.emitGraphSignal)
-        self.workspaceWidget.adjustParameterWidgetsSignal.connect(self.emitAdjustParameterWidgets)
+        self.workspaceWidget.volumeUpdateSignal.connect(self.emitVolumeChanged)
 
     def emitAdjustParameterWidgets(self, key:int):
         self.adjustParameterWidgetsSignal.emit(key)
@@ -107,6 +109,9 @@ class WaveView(QMainWindow):
 
     def emitRandWaveAdd(self):
         self.initiateRandWaveAdditionSignal.emit()
+
+    def emitRandomWaveParams(self, waveCount, freqStr, maxCents, minPoints, maxPoints, minSine, maxSine):
+        self.randomWaveParamsSignal.emit(waveCount, freqStr, maxCents, minPoints, maxPoints, minSine, maxSine)
 
     def emitRedoSignal(self, event):
         self.redoSignal.emit(event)
@@ -249,6 +254,7 @@ class WorkspaceWidget(QWidget):
     durationChangedSignal = Signal(float)
     volumeUpdateSignal = Signal(int, float)
     stopAudioSignal = Signal()
+    randomWaveParamsSignal = Signal(int, str, int, int, int, int, int)
     adjustParameterWidgetsSignal = Signal(int)
 
     def __init__(self, maxWidth, maxHeight):
@@ -259,6 +265,7 @@ class WorkspaceWidget(QWidget):
         self.waveformNameInputWidget.createCatalogWaveSignal.connect(self.createNewWaveformWindow)
         self.waveformNameInputWidget.move(self.maxWidth//2, self.maxHeight//2)
         self.randWaveformsInputWidget = RandomWaveformsInputWidget(maxWidth, maxHeight)
+        self.randWaveformsInputWidget.waveformParametersSignal.connect(self.emitRandomWaveParams)
         self.waveformWidgetDict = {}
         self.gridLayout = QGridLayout(self)
         self.componentGraph = ComponentGraphWidget()
@@ -322,6 +329,19 @@ class WorkspaceWidget(QWidget):
 
     def emitRandomWaveAddInitiate(self):
         self.initiateRandWaveAdditionSignal.emit()
+
+    def emitRandomWaveParams(
+        self
+        , waveCount:int
+        , freqStr:str
+        , maxCents:int
+        , minPoints:int
+        , maxPoints:int
+        , minSine:int
+        , maxSine:int
+    ):
+        self.randomWaveParamsSignal.emit(waveCount, freqStr, maxCents, minPoints, maxPoints, minSine, maxSine)
+        self.randWaveformsInputWidget.setVisible(False)
 
     def emitSineCountChanged(self, key, count:int):
         self.sineCountChangedSignal.emit(key, count)

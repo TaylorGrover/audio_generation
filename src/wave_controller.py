@@ -69,6 +69,8 @@ class WaveController:
 
         # Generate several waves with random points
         self.view.initiateRandWaveAdditionSignal.connect(self.openRandomPointsDialog)
+        self.view.randomWaveParamsSignal.connect(self.generateRandomWaveforms)
+
 
         # TODO: Add a catalog wave to the synthesizing workspace as a component oscillator
 
@@ -127,10 +129,11 @@ class WaveController:
         self.view.setSineInterpolatorWidgetParametersBlocked(sine_count, sine_checked)
         self.view.setComponentVolumeWidgetValue(int(10 * amplitude))
 
-    def generateRandomWaveforms(self):
+    def generateRandomWaveforms(self, waveCount, freqStr, maxCents, minPoints, maxPoints, minSine, maxSine):
         """
-        TODO
         """
+        for _ in range(waveCount):
+            self.createCatalogWave(str(self.keyIndexCounter))
 
     def openRandomPointsDialog(self):
         """
