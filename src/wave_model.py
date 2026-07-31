@@ -48,6 +48,31 @@ class WaveModel:
             , self.amp_env_str: []
         }
 
+    def generateRandomWave(
+        self
+        , key:int
+        , freqStr:str
+        , maxCents:int
+        , minPoints:int
+        , maxPoints:int
+        , minSine:int
+        , maxSine:int
+    ):
+        point_count = np.random.randint(minPoints, maxPoints + 1)
+        points_x = np.random.uniform(0, 1, point_count)
+        points_y = np.random.uniform(-1, 1, point_count)
+        points = np.array([points_x, points_y]).T
+        self.setPoints(key, points)
+        cents = np.random.randint(-np.abs(maxCents), np.abs(maxCents) + 1)
+        self.updateFrequency(key, freqStr, cents, 1)
+        print(minSine, maxSine)
+        sine_count = np.random.randint(minSine, maxSine + 1)
+        print(sine_count)
+        self.updateSineCount(key, sine_count)
+
+
+
+
     def nameExists(self, name:str) -> bool:
         for keyIndex in self.waveDict:
             if self.waveDict[keyIndex][self.name_key_str] == name:
@@ -100,7 +125,19 @@ class WaveModel:
                 wave = self.getComponentWave(key, recalculate=True)
                 self.combined_wave += wave
 
+    def setPoints(self, key:int, points:np.ndarray):
+        sorted_points = sorted(points, key=lambda p: p[0])
+        if self.isPreviouslyCombined:
+            self.subtractWaveFromCombined(key)
+        else:
+            self.isPreviouslyCombined = True
+        self.waveDict[key][self.point_key_str] = sorted_points
+        self.updateLinearInterpolation(key)
+        self.updateSineInterpolation(key)
+        wave = self.getComponentWave(key, recalculate=True)
+        self.combined_wave += wave
 
+        
     def clearGraphPoints(self, keyIndex):
         self.subtractWaveFromCombined(keyIndex)
         self.waveDict[keyIndex][self.point_key_str] = []
@@ -132,12 +169,16 @@ class WaveModel:
         self.waveDict[key][self.sine_checked_str] = isChecked
         self.combined_wave += self.getComponentWave(key, recalculate=True)
 
+    def _calculateFrequency(self, baseFreq:str, cents:int, octave:int):
+        freq = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
+        return freq
+
     def updateFrequency(self, key, baseFreq:str, cents:int, octave:int):
         self.subtractWaveFromCombined(key)
         self.waveDict[key][self.freq_letter_str] = baseFreq
         self.waveDict[key][self.freq_cents_str] = cents
         self.waveDict[key][self.freq_octave_str] = octave
-        self.waveDict[key][self.freq_str] = waveform.NOTE_FREQUENCY_MAP[baseFreq] * 2 ** (cents / 1200) * 2 ** (octave - 1)
+        self.waveDict[key][self.freq_str] = self._calculateFrequency(baseFreq, cents, octave)
         wave = self.getComponentWave(key, recalculate=True)
         self.combined_wave += wave
         

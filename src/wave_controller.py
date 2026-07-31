@@ -123,6 +123,7 @@ class WaveController:
         freq_letter = self.model.getFrequencyLetter(key)
         freq_octave = self.model.getOctave(key)
         sine_count = self.model.getSineCount(key)
+        print(sine_count)
         sine_checked = self.model.getChecked(key)
         amplitude = self.model.getAmplitude(key)
         self.view.setFrequencyWidgetParametersBlocked(freq_cents, freq_letter, freq_octave)
@@ -134,6 +135,9 @@ class WaveController:
         """
         for _ in range(waveCount):
             self.createCatalogWave(str(self.keyIndexCounter))
+            # Need to subtract the key index since it was incremented in the catalog addition function
+            self.model.generateRandomWave(self.keyIndexCounter - 1, freqStr, maxCents, minPoints, maxPoints, minSine, maxSine) 
+            self.adjustParameterWidgets(self.keyIndexCounter - 1)
 
     def openRandomPointsDialog(self):
         """

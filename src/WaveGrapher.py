@@ -1196,7 +1196,7 @@ class RandomWaveformsInputWidget(DialogWidget):
 
         self.maxSineSpin = QSpinBox()
         self.maxSineSpin.setRange(1, 50)
-        self.minSineSpin.setValue(15)
+        self.maxSineSpin.setValue(15)
         
         # For each of these max/min pairs, a change in the min should produce a change in the max
         # without the latter signaling the change, and vice versa. That is, in the case the min
