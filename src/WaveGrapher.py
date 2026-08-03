@@ -900,9 +900,16 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
         self.frequencyEnvelopeButton.clicked.connect(self.emitFreqEnvSelected)
 
+        self.panSlider = QSlider()
+        self.panSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.panSlider.setRange(-10, 10)
+        self.panSlider.setValue(0)
+        self.panSlider.setTickPosition(QSlider.TicksBothSides)
+
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
         self.controlLayout.addRow("Freq:", self.frequencyWidget)
         self.controlLayout.addRow("Envs:", self.envelopeWidget)
+        self.controlLayout.addRow("Pan:", self.panSlider)
         self.controlLayout.addRow("", self.clearButton)
         self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
         self.controlLayout.setSpacing(10)

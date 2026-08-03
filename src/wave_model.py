@@ -65,9 +65,7 @@ class WaveModel:
         self.setPoints(key, points)
         cents = np.random.randint(-np.abs(maxCents), np.abs(maxCents) + 1)
         self.updateFrequency(key, freqStr, cents, 1)
-        print(minSine, maxSine)
         sine_count = np.random.randint(minSine, maxSine + 1)
-        print(sine_count)
         self.updateSineCount(key, sine_count)
 
 
