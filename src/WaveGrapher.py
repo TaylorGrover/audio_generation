@@ -194,8 +194,8 @@ class WaveView(QMainWindow):
     def showComponentGraph(self, keyIndex:int):
         self.workspaceWidget.showComponentGraph(keyIndex)
 
-    def toggleSelectedButton(self, key:int):
-        self.workspaceWidget.toggleSelectedButton(key)
+    def toggleSelected(self, key:int):
+        self.workspaceWidget.toggleSelected(key)
 
     def graphComponentWaveform(self, key, x, y, interp_x, interp_y, sine_x, sine_y):
         self.workspaceWidget.graphComponentWaveform(key, x, y, interp_x, interp_y, sine_x, sine_y)
@@ -366,13 +366,14 @@ class WorkspaceWidget(QWidget):
         currentKey = self.componentGraph.getKeyIndex()
         if currentKey == key:
             # Don't do anything if the button was clicked except retoggle the button
-            self.catalogWidget.toggleSelectedButton(currentKey)
+            self.catalogWidget.toggleSelected(currentKey)
             return
-        self.catalogWidget.untoggleSelectedButton(currentKey)
+        self.catalogWidget.untoggleSelected(currentKey)
         self.componentGraph.setKeyIndex(key)
         self.componentGraph.setTitle(self.catalogWidget.getTitle(key))
         self.emitGraphSignal(key)
         self.emitAdjustParameterWidgets(key)
+        self.showComponentGraph(key)
 
     def setCurrentlyPlayingStatus(self):
         self.componentGraph.setCurrentlyPlayingStatus()
@@ -412,10 +413,10 @@ class WorkspaceWidget(QWidget):
             return
         new_key = ((key - 1) % count) + 1
         self.switchComponentGraph(new_key)
-        self.catalogWidget.toggleSelectedButton(new_key)
+        self.catalogWidget.toggleSelected(new_key)
 
-    def toggleSelectedButton(self, key:int):
-        self.catalogWidget.toggleSelectedButton(key)
+    def toggleSelected(self, key:int):
+        self.catalogWidget.toggleSelected(key)
 
     def clearComponentGraph(self):
         self.componentGraph.clearGraph()
@@ -503,7 +504,7 @@ class WorkspaceWidget(QWidget):
 
     def addWaveToCatalog(self, keyIndex:int, name:str):
         self.catalogWidget.addWaveWidgetToCatalog(keyIndex, name)
-        self.catalogWidget.untoggleSelectedButton(self.componentGraph.getKeyIndex())
+        self.catalogWidget.untoggleSelected(self.componentGraph.getKeyIndex())
         self.componentGraph.setKeyIndex(keyIndex)
         self.waveformNameInputWidget.closeWindowAndClearInput()
 
@@ -1248,12 +1249,14 @@ class WaveformCatalogWidget(QWidget):
     switchToMainSignal = Signal()
     switchToComponentSignal = Signal()
     switchComponentIndex = Signal(int)
+    deleteComponentSignal = Signal()
 
     def __init__(self):
         super().__init__()
         self.vboxLayout = QVBoxLayout(self)
         self.vboxLayout.setSpacing(0)
         self.labeledWavesDict = {}
+        self.catalogComboBox = QComboBox()
         self.catalogSection = QWidget()
         self.catalogVBox = QVBoxLayout(self.catalogSection)
         self.addWaveButton = QPushButton("+")
@@ -1265,6 +1268,7 @@ class WaveformCatalogWidget(QWidget):
         self.toggleGraphButton = QPushButton("Component")
 
         self.vboxLayout.insertWidget(-1, self.toggleGraphButton)
+        self.vboxLayout.insertWidget(-1, self.catalogComboBox)
         self.vboxLayout.addStretch()
         self.vboxLayout.insertWidget(-1, self.catalogSection)
         self.vboxLayout.insertWidget(-1, self.addWaveButton)
@@ -1274,12 +1278,19 @@ class WaveformCatalogWidget(QWidget):
         self.addWaveButton.clicked.connect(self.emitInitiateAddCatalogWave)
         self.addRandomWavesButton.clicked.connect(self.emitInitiateAddRandomWaves)
         self.toggleGraphButton.clicked.connect(self.emitSwapGraphs)
+
+        # Actions
+        deleteAction = QAction("&Delete Component", self, shortcut="Ctrl+d", triggered=self.emitInitiateDeletion)
+        self.addAction(deleteAction)
     
     def emitInitiateAddCatalogWave(self, event):
         self.initiateCatalogAdditionSignal.emit(event)
 
     def emitInitiateAddRandomWaves(self):
         self.initiateRandWaveAdditionSignal.emit()
+
+    def emitInitiateDeletion(self):
+        self.deleteComponentSignal.emit()
 
     def getTitle(self, keyIndex:int):
         return self.labeledWavesDict.get(keyIndex, {}).get("name", "Oscillator")
@@ -1305,20 +1316,28 @@ class WaveformCatalogWidget(QWidget):
             "name": name,
             "widget": button 
         }
-        self.vboxLayout.addWidget(button)
+        self.catalogVBox.addWidget(button)
+        self.catalogComboBox.addItem(name)
         button.clicked.connect(lambda: self.switchComponentIndex.emit(keyIndex))
         self.emitSwapGraphs(keyIndex)
 
     def emitSwapGraphs(self, keyIndex):
         self.swapGraphsSignal.emit(keyIndex)
 
-    def untoggleSelectedButton(self, key:int):
+    def untoggleSelected(self, key:int):
         button = self.getButton(key)
+        self.displayComboKey(key)
         if button:
             button.setCheckable(True)
             button.setChecked(False)
 
-    def toggleSelectedButton(self, key:int):
+    def toggleSelected(self, key:int):
         button = self.getButton(key)
+        self.displayComboKey(key)
         if button:
             button.setChecked(True)
+
+    def displayComboKey(self, key:int):
+        self.catalogComboBox.blockSignals(True)
+        self.catalogComboBox.setCurrentIndex(key - 1)
+        self.catalogComboBox.blockSignals(False)

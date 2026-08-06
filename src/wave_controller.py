@@ -229,7 +229,7 @@ class WaveController:
             self.clearComponentGraph()
             self.adjustParameterWidgets(self.keyIndexCounter)
             self.view.swapGraphs()
-            self.view.toggleSelectedButton(self.keyIndexCounter)
+            self.view.toggleSelected(self.keyIndexCounter)
             self.keyIndexCounter += 1
         else:
             self.view.displayDupNameErrMsg()
