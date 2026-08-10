@@ -37,8 +37,8 @@ class WaveModel:
             , self.point_key_str: []
             , self.linear_interp_str: np.array([[]])
             , self.sine_interp_str: np.array([])
-            , self.sine_extrap_str: np.zeros(initial_samples)
-            , self.linear_extrap_str: np.zeros(initial_samples)
+            , self.sine_extrap_str: np.zeros((initial_samples, 2))
+            , self.linear_extrap_str: np.zeros((initial_samples, 2))
             , self.amp_str: 1.0
             , self.freq_str: waveform.F
             , self.sine_count_str: 8
@@ -268,13 +268,7 @@ class WaveModel:
 
     def calculatePlayableWave(self, wave:np.ndarray) -> np.ndarray:
         amp_max = np.max(np.abs(wave), axis=0)
-        if amp_max > 0:
-            new_wave = wave / amp_max
-        else:
-            # It's all zeros
-            return wave
-        if len(wave.shape) == 1:
-            new_wave = np.array([new_wave, new_wave]).T
+        new_wave = np.divide(wave, amp_max, where=amp_max > 0)
         fade_out = waveform.fade_out(new_wave, .005, self.sample_rate)
         fade_in = waveform.fade_in(fade_out, .001, self.sample_rate)
         return fade_in
@@ -309,16 +303,16 @@ class WaveModel:
             frequency = self.getFrequency(key)
             sine_count = self.getSineCount(key)
             x, y = self.getInterpolatedXY(key)
-            wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count).T[0]
+            wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count)
             wave = self._normalize(wave)
+            print(wave.shape)
             self.waveDict[key][self.sine_extrap_str] = wave
         else:
             self.waveDict[key][self.sine_extrap_str] = np.zeros_like(self.t)
 
     def _normalize(self, wave:np.ndarray):
         max_amp = np.max(np.abs(wave), axis=0)
-        if max_amp > 0:
-            wave /= max_amp
+        wave = np.divide(wave, max_amp, where=max_amp > 0)
         return wave
 
     def getSineExtrapolatedWave(self, key, recalculate=False):

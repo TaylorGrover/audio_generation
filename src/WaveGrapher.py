@@ -912,7 +912,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
         self.panSpin = QDoubleSpinBox()
         self.panSpin.setRange(-100, 100)
-        self.panSpin.setSingleStep(1)
+        self.panSpin.setSingleStep(10)
         self.panSpin.setValue(0)
 
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
