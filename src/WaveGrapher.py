@@ -526,10 +526,13 @@ class CentralGraphWidget(QWidget):
         self.globalFreqShiftSpin.setValue(0)
         self.globalFreqShiftSpin.valueChanged.connect(self.emitGlobalFreqChanged)
         self.window = pg.GraphicsLayoutWidget()
-        self.graph = self.window.addPlot(title="Global Graph", row=0, col=0)
-        self.graph.showGrid(True, True, .2)
-        self.graph.setLimits(xMin=0, xMax=10, yMin=-10, yMax=10)
-        self.mouseMovedProxy = pg.SignalProxy(self.graph.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)
+        self.left_graph = self.window.addPlot(title="Left Global Graph", row=0, col=0)
+        self.left_graph.showGrid(True, True, .2)
+        self.left_graph.setLimits(xMin=0, xMax=10, yMin=-10, yMax=10)
+        self.right_graph = self.window.addPlot(title="Right Global Graph", row=1, col=0)
+        self.right_graph.showGrid(True, True, .2)
+        self.right_graph.setLimits(xMin=0, xMax=10, yMin=-10, yMax=10)
+        #self.mouseMovedProxy = pg.SignalProxy(self.graph.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)
 
         self.vertical = pg.InfiniteLine(angle=90, movable=False, pen="#00ccff")
         self.horizontal = pg.InfiniteLine(angle=0, movable=False, pen="#00ccff")
@@ -552,9 +555,13 @@ class CentralGraphWidget(QWidget):
 
     def graphCombinedWave(self, t:np.ndarray, wave:np.ndarray, sample_rate:int):
         # TODO: Can the sample_rate be safely assumed to be larger than 0?
+        wave_max = np.max(wave, axis=0)
+        wave_min = np.min(wave, axis=0)
         self.clearGraph()
-        self.graph.plot(t, wave, pen=self.pen)
-        self.graph.setLimits(xMin=0, xMax=wave.shape[0] / sample_rate, yMin=np.min(wave), yMax=np.max(wave))
+        self.left_graph.plot(t, wave[:, 0], pen=self.pen)
+        self.right_graph.plot(t, wave[:, 1], pen=self.pen)
+        self.left_graph.setLimits(xMin=0, xMax=wave.shape[0] / sample_rate, yMin=wave_min[0], yMax=wave_max[0])
+        self.right_graph.setLimits(xMin=0, xMax=wave.shape[0] / sample_rate, yMin=wave_min[1], yMax=wave_max[1])
 
     def mouseMoved(self, event):
         """
@@ -567,9 +574,10 @@ class CentralGraphWidget(QWidget):
             self.horizontal.setPos(mousePoint.y())
 
     def clearGraph(self):
-        self.graph.clear()
-        self.graph.addItem(self.vertical)
-        self.graph.addItem(self.horizontal)
+        self.left_graph.clear()
+        self.right_graph.clear()
+        #self.graph.addItem(self.vertical)
+        #self.graph.addItem(self.horizontal)
 
     def emitStopAudio(self):
         self.stopAudioSignal.emit()

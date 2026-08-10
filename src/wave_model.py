@@ -341,7 +341,7 @@ class WaveModel:
         return self.combined_wave
 
     def getTime(self):
-        return self.t
+        return self.t[:, 0]
 
     def getPlayableCombinedWave(self):
         wave = self.calculatePlayableWave(self.combined_wave)
