@@ -22,9 +22,11 @@ class WaveModel:
         self.freq_octave_str = "freq_octave"
         self.freq_env_str = "freq_env"
         self.amp_env_str = "amp_env"
+        self.pan_str = "pan_amount"
         self.duration = 1
         self.sample_rate = 48000
         self.t = np.linspace(0, self.duration, int(self.duration * self.sample_rate))
+        self.t = np.array([self.t, self.t]).T
         self.combined_wave = np.zeros_like(self.t)
         self.isPreviouslyCombined = False
     
@@ -46,6 +48,7 @@ class WaveModel:
             , self.freq_cents_str: 0
             , self.freq_env_str: []
             , self.amp_env_str: []
+            , self.pan_str: 0.0
         }
 
     def generateRandomWave(

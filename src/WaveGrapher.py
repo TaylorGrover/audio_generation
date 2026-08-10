@@ -503,7 +503,7 @@ class WorkspaceWidget(QWidget):
         self.randWaveformsInputWidget.setVisible(True)
 
     def addWaveToCatalog(self, keyIndex:int, name:str):
-        self.catalogWidget.addWaveWidgetToCatalog(keyIndex, name)
+        self.catalogWidget.addWaveToCatalog(keyIndex, name)
         self.catalogWidget.untoggleSelected(self.componentGraph.getKeyIndex())
         self.componentGraph.setKeyIndex(keyIndex)
         self.waveformNameInputWidget.closeWindowAndClearInput()
@@ -512,6 +512,7 @@ class CentralGraphWidget(QWidget):
     playSignal = Signal(int)
     durationChangedSignal = Signal(float)
     stopAudioSignal = Signal()
+    globalFreqShiftSignal = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -520,6 +521,10 @@ class CentralGraphWidget(QWidget):
         self.pen = pg.mkPen("#ff3300", width=3)
 
         self.graphParametersWidget.playSignal.connect(lambda e: self.playSignal.emit(0))
+        self.globalFreqShiftSpin = QSpinBox()
+        self.globalFreqShiftSpin.setRange(-12, 12)
+        self.globalFreqShiftSpin.setValue(0)
+        self.globalFreqShiftSpin.valueChanged.connect(self.emitGlobalFreqChanged)
         self.window = pg.GraphicsLayoutWidget()
         self.graph = self.window.addPlot(title="Global Graph", row=0, col=0)
         self.graph.showGrid(True, True, .2)
@@ -538,6 +543,9 @@ class CentralGraphWidget(QWidget):
         # CentralGraph Actions
         playAction = QAction("&Play Sound", self, shortcut="Space", triggered=self.graphParametersWidget.emitPlayButtonSignal)
         self.addAction(playAction)
+
+    def emitGlobalFreqChanged(self):
+        self.globalFreqShiftSignal.emit(self.globalFreqShiftSpin.value())
     
     def setCurrentlyPlayingStatus(self):
         self.graphParametersWidget.setCurrentlyPlayingStatus()
@@ -872,6 +880,7 @@ class GraphParametersWidget(GenericGraphParametersWidget):
     frequencyChangedSignal = Signal(str, int, int)
     sineStateChangedSignal = Signal(bool)
     sineCountChangedSignal = Signal(int)
+    panChangedSignal = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -901,16 +910,15 @@ class GraphParametersWidget(GenericGraphParametersWidget):
 
         self.frequencyEnvelopeButton.clicked.connect(self.emitFreqEnvSelected)
 
-        self.panSlider = QSlider()
-        self.panSlider.setOrientation(QtCore.Qt.Horizontal)
-        self.panSlider.setRange(-10, 10)
-        self.panSlider.setValue(0)
-        self.panSlider.setTickPosition(QSlider.TicksBothSides)
+        self.panSpin = QDoubleSpinBox()
+        self.panSpin.setRange(-100, 100)
+        self.panSpin.setSingleStep(1)
+        self.panSpin.setValue(0)
 
         self.controlLayout.addRow("Sine:", self.sineInterpolatorWidget)
         self.controlLayout.addRow("Freq:", self.frequencyWidget)
         self.controlLayout.addRow("Envs:", self.envelopeWidget)
-        self.controlLayout.addRow("Pan:", self.panSlider)
+        self.controlLayout.addRow("Pan:", self.panSpin)
         self.controlLayout.addRow("", self.clearButton)
         self.controlLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
         self.controlLayout.setSpacing(10)
@@ -922,12 +930,16 @@ class GraphParametersWidget(GenericGraphParametersWidget):
         self.sineInterpolatorWidget.changedSignal.connect(self.emitSineStateChanged)
         self.sineInterpolatorWidget.sineCountChangedSignal.connect(self.emitSineCountChanged)
         self.frequencyWidget.frequencyChangedSignal.connect(self.emitFrequencyParameters)
+        self.panSpin.valueChanged.connect(self.emitPanChanged)
 
     def emitFreqEnvSelected(self):
         self.freqEnvSelectedSignal.emit()
 
     def emitFrequencyParameters(self, baseFreq, cents, octave):
         self.frequencyChangedSignal.emit(baseFreq, cents, octave)
+
+    def emitPanChanged(self):
+        self.panChangedSignal.emit(self.panSpin.value())
 
     def emitSineCountChanged(self, count):
         self.sineCountChangedSignal.emit(count)
@@ -1205,6 +1217,9 @@ class RandomWaveformsInputWidget(DialogWidget):
         self.maxSineSpin = QSpinBox()
         self.maxSineSpin.setRange(1, 50)
         self.maxSineSpin.setValue(15)
+
+        self.maxPanSpin = QDoubleSpinBox()
+        self.maxPanSpin.setRange(-1, 1)
         
         # For each of these max/min pairs, a change in the min should produce a change in the max
         # without the latter signaling the change, and vice versa. That is, in the case the min
@@ -1216,6 +1231,7 @@ class RandomWaveformsInputWidget(DialogWidget):
         self.formLayout.addRow("Max Points:", self.maxPointsSpin)
         self.formLayout.addRow("Min Sine:" , self.minSineSpin)
         self.formLayout.addRow("Max Sine:", self.maxSineSpin)
+        self.formLayout.addRow("Max Pan:", self.maxPanSpin)
 
     def clearParamFields(self):
         pass
@@ -1257,6 +1273,7 @@ class WaveformCatalogWidget(QWidget):
         self.vboxLayout.setSpacing(0)
         self.labeledWavesDict = {}
         self.catalogComboBox = QComboBox()
+        #self.catalogComboBox.currentIndexChanged.connect(self.emitSwitchIndex)
         self.catalogSection = QWidget()
         self.catalogVBox = QVBoxLayout(self.catalogSection)
         self.addWaveButton = QPushButton("+")
@@ -1308,7 +1325,7 @@ class WaveformCatalogWidget(QWidget):
     def toggleComponentButton(self):
         self.toggleGraphButton.setText("Component")
 
-    def addWaveWidgetToCatalog(self, keyIndex, name:str):
+    def addWaveToCatalog(self, keyIndex, name:str):
         button = QPushButton(name)
         button.setCheckable(True)
         button.setStyleSheet("QPushButton:checked {background-color: #a0a0a0;}")
@@ -1323,6 +1340,7 @@ class WaveformCatalogWidget(QWidget):
 
     def emitSwapGraphs(self, keyIndex):
         self.swapGraphsSignal.emit(keyIndex)
+
 
     def untoggleSelected(self, key:int):
         button = self.getButton(key)
