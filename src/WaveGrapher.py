@@ -530,6 +530,7 @@ class CentralGraphWidget(QWidget):
         self.left_graph.showGrid(True, True, .2)
         self.left_graph.setLimits(xMin=0, xMax=10, yMin=-10, yMax=10)
         self.right_graph = self.window.addPlot(title="Right Global Graph", row=1, col=0)
+        self.right_graph.setXLink(self.left_graph)
         self.right_graph.showGrid(True, True, .2)
         self.right_graph.setLimits(xMin=0, xMax=10, yMin=-10, yMax=10)
         #self.mouseMovedProxy = pg.SignalProxy(self.graph.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)

@@ -215,6 +215,7 @@ class WaveModel:
     def updateDuration(self, duration:float):
         self.duration = duration
         self.t = np.linspace(0, duration, int(duration * self.sample_rate))
+        self.t = np.array([self.t, self.t]).T
         self.calculateCombinedWave(recalculate=True)
 
     def getFrequency(self, key):
@@ -305,7 +306,6 @@ class WaveModel:
             x, y = self.getInterpolatedXY(key)
             wave = waveform.seeded_waveform(1, self.duration, frequency, y, self.sample_rate, sine_count)
             wave = self._normalize(wave)
-            print(wave.shape)
             self.waveDict[key][self.sine_extrap_str] = wave
         else:
             self.waveDict[key][self.sine_extrap_str] = np.zeros_like(self.t)
